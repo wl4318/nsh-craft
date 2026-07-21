@@ -525,6 +525,10 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
       <div class="stat-item"><div class="stat-value profit-positive" id="statBestProfit">--</div><div class="stat-label">最高基础利润</div></div>
       <div class="stat-item"><div class="stat-value" style="color:var(--cyan)" id="statBestStamina">--</div><div class="stat-label">最佳单位体力利润</div></div>
       <div class="stat-item"><div class="stat-value" style="color:var(--purple)" id="statTotalMaterials">0</div><div class="stat-label">材料种类</div></div>
+      <div class="stat-item" id="statLastUpdate" style="display:none;"><div class="stat-value" style="font-size:0.8rem;color:var(--text-dim);" id="statUpdateInfo">--</div><div class="stat-label">最后更新</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:0.72rem;color:var(--text-dim);">
+      <span id="nickDisplay" style="cursor:pointer;" onclick="setNickname()" title="点击设置昵称">👤 未设置昵称</span>
     </div>
 
     <!-- Trend Chart (hidden) -->
@@ -633,6 +637,29 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
 const STORAGE_KEY = 'mmo_craft_cloud_v1';
 const SUPABASE_URL = 'https://voreyobicculgcfudfae.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_AijTqALCInLK0Ip6bokqgA__wSHIlle';
+
+let nickname = localStorage.getItem('nickname') || '';
+function setNickname() {
+  var n = prompt('设置你的昵称（群友能看到谁更新了数据）：', nickname);
+  if (n !== null && n.trim()) {
+    nickname = n.trim();
+    localStorage.setItem('nickname', nickname);
+    document.getElementById('nickDisplay').textContent = '👤 ' + nickname;
+  }
+}
+
+function updateLastUpdate() {
+  var el = document.getElementById('statLastUpdate');
+  var info = document.getElementById('statUpdateInfo');
+  if (!el || !info) return;
+  if (data.lastUpdatedAt && data.lastUpdatedBy) {
+    var d = new Date(data.lastUpdatedAt);
+    var ago = Math.floor((Date.now() - d) / 60000);
+    var t = ago < 1 ? '刚刚' : (ago < 60 ? ago + '分钟前' : (ago < 1440 ? Math.floor(ago/60)+'小时前' : Math.floor(ago/1440)+'天前'));
+    info.textContent = data.lastUpdatedBy + ' · ' + t;
+    el.style.display = 'block';
+  }
+}
 let sbClient = null;
 let cloudEnabled = false;
 
@@ -673,6 +700,21 @@ const SORT_FIELDS = ['name','sellPrice','afterTax','cost','profit','profitRate',
 
 function loadData() {
   try {
+    // Auto-migrate from old storage keys
+    var oldKeys = ['mmo_craft_calc_data', 'mmo_craft_calc_v2', 'mmo_craft_calc_v2new'];
+    for (var i = 0; i < oldKeys.length; i++) {
+      var oldRaw = localStorage.getItem(oldKeys[i]);
+      if (oldRaw) {
+        try {
+          var oldData = JSON.parse(oldRaw);
+          if (oldData.products && oldData.products.length > 0) {
+            localStorage.setItem(STORAGE_KEY, oldRaw);
+            localStorage.removeItem(oldKeys[i]);
+            break;
+          }
+        } catch(e) {}
+      }
+    }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const d = JSON.parse(raw);
@@ -686,13 +728,18 @@ function loadData() {
       if (!d.priceHistory) d.priceHistory = {};
       if (!d.freightPresets) d.freightPresets = [];
       if (d.treasurePrice === undefined) d.treasurePrice = 0;
+      if (!d.lastUpdatedBy) d.lastUpdatedBy = "";
+      if (!d.lastUpdatedAt) d.lastUpdatedAt = "";
+      if (!d.lastUpdatedBy) d.lastUpdatedBy = "";
+      if (!d.lastUpdatedAt) d.lastUpdatedAt = "";
       return d;
     }
   } catch(e) {}
   return { systemMaterials: [], playerMaterials: [], products: [], priceHistory: {} };
 }
 
-function saveData() { 
+function saveData() {
+  if (nickname) { data.lastUpdatedBy = nickname; data.lastUpdatedAt = new Date().toISOString(); }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   cloudSave(data);
 }
@@ -770,6 +817,7 @@ function renderAll() {
   renderProductTable('potion');
   renderProductTable('cultivate');
   updateStats();
+  updateLastUpdate();
 }
 
 // ---- System Materials ----
@@ -1430,8 +1478,6 @@ function onTrendCatChange() {
 
 function populateTrendSelect() {}
 
-}
-
 function clearTrendHistory() {
   const key = document.getElementById('trendItemSelect').value;
   if (!key) return;
@@ -1606,7 +1652,7 @@ function renderFreightGrid() {
       const name = p ? p.name : '(已删除)';
       return '<div class="freight-slot filled calculated" title="点击清除"><span class="slot-num">' + (slot.order||'') + '</span><span class="slot-name">' + esc(name) + ' ×' + slot.qty + ' → ' + (slot.rewardQty||3) + '残片</span><span class="slot-clear" onclick="clearFreightSlot(' + idx + ')">✕</span></div>';
     }
-    return '<div class="freight-slot" onclick="pickPresetForSlot(' + idx + ')"><span style="color:var(--text-dim);font-size:0.7rem;">+ 点击选择方案</span></div>';
+    return '<div class="freight-slot"><span style="color:var(--text-dim);font-size:0.7rem;">+ 点击/拖入方案</span></div>';
   }).join('');
 }
 
@@ -1641,6 +1687,7 @@ function addToSlot(presetIdx) {
   renderFreightGrid();
 }
 
+function dropOnSlot(e,idx){e.preventDefault();e.target.style.borderColor="";var pi=parseInt(e.dataTransfer.getData("presetIdx"));if(!isNaN(pi)&&pi>=0){var pr=freightPresets[pi];freightSlots[idx]={productId:pr.productId,qty:pr.qty,name:pr.name,rewardQty:pr.rewardQty||3};saveFreightSlots();renderFreightGrid();}}
 function clearFreightSlot(idx) {
   freightSlots[idx] = null;
   saveFreightSlots();
@@ -1649,24 +1696,33 @@ function clearFreightSlot(idx) {
 
 function addFreightPreset() {
   const prods = data.products.filter(p => p.category === "cultivate");
-  if (!prods.length) { toast('请先在产物列表中添加产物','error'); return; }
-  const list = prods.map((p,i) => (i+1) + '. ' + p.name).join('\n');
-  const choice = prompt('选择产物（输入序号）：\n\n' + list);
-  if (!choice) return;
-  const idx = parseInt(choice) - 1;
-  if (isNaN(idx) || idx < 0 || idx >= prods.length) { toast('无效序号','error'); return; }
-  const prod = prods[idx];
-  const qty = parseInt(prompt(prod.name + '\n需要提交的道具数量（n）：', '1'));
-  if (!qty || qty <= 0) return;
-  const reward = parseInt(prompt('获得的残片数量（m）：', '3'));
-  if (!reward || reward <= 0) return;
-  const dup = freightPresets.find(p => p.productId === prod.id && p.qty === qty && p.rewardQty === reward);
-  if (dup) { toast('该方案已存在：' + dup.name,'error'); return; }
-  freightPresets.push({ id: genId(), name: prod.name + ' ×' + qty, productId: prod.id, qty, rewardQty: reward });
-data.freightPresets = freightPresets;
-  saveData();
-  renderPresetList();
-  toast('方案已添加');
+  if (!prods.length) { toast('请先在产物列表中添加养成材料类产物','error'); return; }
+  let m = document.createElement('div');
+  m.className = 'modal-mask';
+  m.innerHTML = '<div class="modal-box" style="max-width:380px;"><h3>添加货运方案</h3>' +
+    '<label>产物</label><select id="fpProd" style="width:100%;padding:7px 10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:0.9rem;border-radius:4px;">' +
+    prods.map((p,i) => '<option value="'+i+'">'+esc(p.name)+'</option>').join('') + '</select>' +
+    '<label>提交数量（n）</label><input type="number" id="fpQty" value="1" min="1">' +
+    '<label>获得残片数（m）</label><input type="number" id="fpReward" value="3" min="1">' +
+    '<div class="modal-actions"><button class="btn btn-sm" onclick="closeModal()">取消</button><button class="btn btn-primary btn-sm" id="fpSave">确认</button></div></div>';
+  document.body.appendChild(m);
+  document.getElementById('fpQty').focus();
+  document.getElementById('fpSave').onclick = function() {
+    var idx = parseInt(document.getElementById('fpProd').value);
+    var prod = prods[idx];
+    var qty = parseInt(document.getElementById('fpQty').value) || 1;
+    var reward = parseInt(document.getElementById('fpReward').value) || 3;
+    var dup = freightPresets.find(p => p.productId === prod.id && p.qty === qty && p.rewardQty === reward);
+    if (dup) { toast('该方案已存在：'+dup.name,'error'); return; }
+    freightPresets.push({ id: genId(), name: prod.name + ' ×' + qty, productId: prod.id, qty, rewardQty: reward });
+    data.freightPresets = freightPresets;
+    saveData();
+    renderPresetList();
+    closeModal();
+    toast('方案已添加');
+  };
+  m.addEventListener('click', function(e) { if (e.target === m) closeModal(); });
+  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', esc); } });
 }
 
 function deleteFreightPreset(idx) {
@@ -1890,6 +1946,8 @@ function onDrop(e) {
 renderAll();
 loadFreightData();
 initDragDrop();
+if (nickname) document.getElementById("nickDisplay").textContent = "\u{1F464} " + nickname;
+if (nickname) document.getElementById("nickDisplay").textContent = "\u{1F464} " + nickname;
 // 后台尝试云端连接
 initCloud();
 if (cloudEnabled) {
