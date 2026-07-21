@@ -1900,7 +1900,12 @@ if (cloudEnabled) {
   cloudLoad().then(d => { if (d) { data = d; loadFreightData(); saveData(); renderAll(); } });
   // 记录访问日志
   fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{
-    sbClient.from('visits').insert({ip:d.ip, user_agent:navigator.userAgent}).then(()=>{});
+    const ip = d.ip;
+    fetch('https://ipapi.co/' + ip + '/json/').then(r=>r.json()).then(geo => {
+      sbClient.from('visits').insert({ip:ip, user_agent:navigator.userAgent, country:geo.country_name, region:geo.region, city:geo.city}).then(()=>{});
+    }).catch(()=>{
+      sbClient.from('visits').insert({ip:ip, user_agent:navigator.userAgent}).then(()=>{});
+    });
   }).catch(()=>{});
 }
 </script>
