@@ -1898,6 +1898,10 @@ initCloud();
 if (cloudEnabled) {
   cloudListen();
   cloudLoad().then(d => { if (d) { data = d; loadFreightData(); saveData(); renderAll(); } });
+  // 记录访问日志
+  fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{
+    sbClient.from('visits').insert({ip:d.ip, user_agent:navigator.userAgent}).then(()=>{});
+  }).catch(()=>{});
 }
 </script>
 
