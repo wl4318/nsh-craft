@@ -625,8 +625,6 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
   税后收入 = ⌊售价 × 0.95⌋（向下取整） &nbsp;|&nbsp;
   期望利润 = (1 + 双倍概率) × 税后收入 − 原料成本 &nbsp;|&nbsp;
   数据自动保存在浏览器本地
-  <span style="cursor:pointer;color:var(--text-dim);margin-left:8px;" onclick="showStats()" title="点击查看访问统计">📊</span>
-  <span id="hiddenStats" style="display:none;"></span>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -1432,19 +1430,6 @@ function onTrendCatChange() {
 
 function populateTrendSelect() {}
 
-function showStats() {
-  var pw = prompt('密码：');
-  if (pw !== '4318') return;
-  var s = document.getElementById('hiddenStats');
-  s.style.display = 'inline';
-  s.textContent = ' 加载中...';
-  sbClient.from('visits').select('*', { count: 'exact', head: true }).then(function(r) {
-    var total = r.count || 0;
-    sbClient.from('visits').select('ip', { count: 'exact', head: true }).then(function(r2) {
-      var uv = r2.count || 0;
-      s.innerHTML = '&nbsp;|&nbsp; 访问 ' + total + ' 次 · IP ' + uv + ' 个';
-    });
-  });
 }
 
 function clearTrendHistory() {
