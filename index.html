@@ -1684,6 +1684,11 @@ function loadFreightData() {
   // Load local slots
   try { const s = localStorage.getItem('freight_slots'); if (s) freightSlots = JSON.parse(s); } catch(e) {}
   renderFreight();
+  // Re-bind draggable after render
+  setTimeout(function() {
+    var card = document.getElementById('card-freight');
+    if (card) card.querySelectorAll('.preset-item').forEach(function(el) { el.setAttribute('draggable', 'true'); });
+  }, 100);
 }
 
 function savePessimisticRate() {
@@ -1733,6 +1738,45 @@ function renderPresetList() {
 function renderFreight() {
   renderFreightGrid();
   renderPresetList();
+}
+
+// Initialize drag-drop once on the freight card
+function initFreightDrag() {
+  var card = document.getElementById('card-freight');
+  if (!card) return;
+  card.addEventListener('dragstart', function(e) {
+    var el = e.target.closest('.preset-item');
+    if (!el) return;
+    var presets = Array.from(card.querySelectorAll('.preset-item'));
+    var idx = presets.indexOf(el);
+    if (idx >= 0) e.dataTransfer.setData('presetIdx', idx);
+  });
+  card.addEventListener('dragover', function(e) {
+    var slot = e.target.closest('.freight-slot');
+    if (slot) { e.preventDefault(); slot.classList.add('drag-over'); }
+  });
+  card.addEventListener('dragleave', function(e) {
+    var slot = e.target.closest('.freight-slot');
+    if (slot) slot.classList.remove('drag-over');
+  });
+  card.addEventListener('drop', function(e) {
+    var slot = e.target.closest('.freight-slot');
+    if (!slot) return;
+    e.preventDefault();
+    slot.classList.remove('drag-over');
+    var slots = Array.from(card.querySelectorAll('.freight-slot'));
+    var i = slots.indexOf(slot);
+    if (i < 0) return;
+    var pi = parseInt(e.dataTransfer.getData('presetIdx'));
+    if (!isNaN(pi) && pi >= 0 && freightPresets[pi]) {
+      var pr = freightPresets[pi];
+      freightSlots[i] = { productId: pr.productId, qty: pr.qty, name: pr.name, rewardQty: pr.rewardQty || 3 };
+      saveFreightSlots();
+      renderFreightGrid();
+    }
+  });
+  // Make preset items draggable
+  card.querySelectorAll('.preset-item').forEach(function(el) { el.setAttribute('draggable', 'true'); });
 }
 
 let pickTargetSlot = -1;
@@ -2021,6 +2065,7 @@ function onDrop(e) {
 })();
 renderAll();
 loadFreightData();
+initFreightDrag();
 initDragDrop();
 if (nickname) document.getElementById("nickDisplay").textContent = "\u{1F464} " + nickname;
 if (nickname) document.getElementById("nickDisplay").textContent = "\u{1F464} " + nickname;
