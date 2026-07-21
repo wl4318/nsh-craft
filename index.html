@@ -685,7 +685,9 @@ async function cloudLoad() {
 async function cloudSave(d) {
   if (!cloudEnabled || !sbClient) return;
   try {
-    await sbClient.from('game_data').upsert({ id: 'v2', data: d, updated_at: new Date().toISOString() });
+    var clean = JSON.parse(JSON.stringify(d));
+    clean.products.forEach(function(p) { delete p.doubleChance; });
+    await sbClient.from('game_data').upsert({ id: 'v2', data: clean, updated_at: new Date().toISOString() });
   } catch(e) {}
 }
 
@@ -740,6 +742,10 @@ function loadData() {
 
 function saveData() {
   if (nickname) { data.lastUpdatedBy = nickname; data.lastUpdatedAt = new Date().toISOString(); }
+  // Save doubleChance locally (not synced)
+  var dc = {};
+  data.products.forEach(function(p) { if (p.doubleChance !== undefined) dc[p.id] = p.doubleChance; });
+  localStorage.setItem('mmo_doubleChance', JSON.stringify(dc));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   cloudSave(data);
 }
@@ -944,8 +950,26 @@ function renderProductTable(cat) {
     const prStr = isFinite(p.profitRate) ? fmtPct(p.profitRate) : (p.profitRate > 0 ? '∞' : '0.0%');
     const eprStr = isFinite(p.expectedProfitRate) ? fmtPct(p.expectedProfitRate) : (p.expectedProfitRate > 0 ? '∞' : '0.0%');
     const ingStr = p.ingredientDetails.map(d => `${d.name}×${d.quantity}`).join(', ');
+    // Price history info
+    var phKey = 'prod_' + p.id;
+    var phArr = data.priceHistory && data.priceHistory[phKey] ? data.priceHistory[phKey] : [];
+    var lastMod = phArr.length > 0 ? phArr[phArr.length-1] : null;
+    var modInfo = '';
+    if (lastMod) {
+      var modDate = new Date(lastMod.date);
+      var modStr = (modDate.getMonth()+1)+'-'+modDate.getDate()+' '+String(modDate.getHours()).padStart(2,'0')+':'+String(modDate.getMinutes()).padStart(2,'0');
+      var prevPrice = phArr.length > 1 ? phArr[phArr.length-2].price : null;
+      modInfo = ' | <b>最后修改：</b>' + modStr + (prevPrice ? '，' + prevPrice + ' → ' + lastMod.price + ' G' : '，' + lastMod.price + ' G');
+    }
+    // Name color by staleness: older = more visible
+    var nameColor = '';
+    if (lastMod) {
+      var agoH = (Date.now() - new Date(lastMod.date)) / 3600000;
+      if (agoH >= 24) nameColor = 'color:var(--red);font-weight:700;';
+      else if (agoH >= 12) nameColor = 'color:var(--orange);';
+    }
     return `<tr>
-      <td><strong>${esc(p.name)}</strong><span class="info-tip"> ℹ<span class="tip-popup"><b>体力：</b>${p.staminaCost} 体 &nbsp;|&nbsp; <b>产出：</b>${p.baseOutput||1} 个<br><b>原料：</b>${esc(ingStr)}</span></span><span class="edit-prod-btn" onclick="editProduct('${p.id}')" title="编辑产物"> ✎</span></td>
+      <td><strong style="${nameColor}">${esc(p.name)}</strong><span class="info-tip"> ℹ<span class="tip-popup"><b>体力：</b>${p.staminaCost} 体 &nbsp;|&nbsp; <b>产出：</b>${p.baseOutput||1} 个<br><b>原料：</b>${esc(ingStr)}${modInfo}</span></span><span class="edit-prod-btn" onclick="editProduct('${p.id}')" title="编辑产物"> ✎</span></td>
       <td>${fmtGold(p.sellPrice)} G</td>
       <td class="income-cell">${fmtGold(p.totalIncome)} G</td>
       <td class="cost-cell">${fmtGold(p.cost)} G</td>
@@ -1953,6 +1977,8 @@ initCloud();
 if (cloudEnabled) {
   cloudListen();
   cloudLoad().then(d => { if (d) { data = d; loadFreightData(); saveData(); renderAll(); } });
+  // Restore doubleChance from localStorage
+  try { var dc = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); data.products.forEach(function(p) { if (dc[p.id] !== undefined) p.doubleChance = dc[p.id]; }); } catch(e) {}
   // 记录访问日志
   fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{
     const ip = d.ip;
