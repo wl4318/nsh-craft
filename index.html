@@ -685,9 +685,9 @@ async function cloudLoad() {
 async function cloudSave(d) {
   if (!cloudEnabled || !sbClient) return;
   try {
-    var clean = JSON.parse(JSON.stringify(d));
-    clean.products.forEach(function(p) { delete p.doubleChance; });
-    await sbClient.from('game_data').upsert({ id: 'v2', data: clean, updated_at: new Date().toISOString() });
+    var uploadData = JSON.parse(JSON.stringify(d));
+    uploadData.products.forEach(function(p) { delete p.doubleChance; });
+    await sbClient.from('game_data').upsert({ id: 'v2', data: uploadData, updated_at: new Date().toISOString() });
   } catch(e) {}
 }
 
@@ -695,7 +695,7 @@ function cloudListen() {
   if (!cloudEnabled || !sbClient) return;
   sbClient.channel('data_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'game_data' }, () => {
-      cloudLoad().then(d => { if (d) { data = d; loadFreightData(); renderAll(); toast('📡 数据已从云端更新', 'success'); } });
+      cloudLoad().then(d => { if (d) { data = d; try { var dc2 = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); data.products.forEach(function(p) { if (dc2[p.id] !== undefined) p.doubleChance = dc2[p.id]; }); } catch(e) {} loadFreightData(); renderAll(); toast('📡 数据已从云端更新', 'success'); } });
     }).subscribe();
 }
 const SORT_FIELDS = ['name','sellPrice','afterTax','cost','profit','profitRate','expectedProfit','expectedProfitRate','staminaProfit','staminaExpectedProfit','staminaExpectedLow'];
@@ -742,7 +742,6 @@ function loadData() {
 
 function saveData() {
   if (nickname) { data.lastUpdatedBy = nickname; data.lastUpdatedAt = new Date().toISOString(); }
-  // Save doubleChance locally (not synced)
   var dc = {};
   data.products.forEach(function(p) { if (p.doubleChance !== undefined) dc[p.id] = p.doubleChance; });
   localStorage.setItem('mmo_doubleChance', JSON.stringify(dc));
@@ -977,8 +976,8 @@ function renderProductTable(cat) {
       <td class="${pc}">${prStr}</td>
       <td class="${epc}">${p.expectedProfit>=0?'+':''}${fmtGold(p.expectedProfit)} G</td>
       <td class="${epc}">${eprStr}</td>
-      <td class="stamina-cell">${fmtDec(p.staminaProfit,1)} G/体</td>
-      <td class="stamina-cell">${fmtDec(p.staminaExpectedProfit,1)} G/体</td>
+      <td class="${p.staminaProfit < 0 ? 'profit-negative' : 'stamina-cell'}">${fmtDec(p.staminaProfit,1)} G/体</td>
+      <td class="${p.staminaExpectedProfit < 0 ? 'profit-negative' : 'stamina-cell'}">${fmtDec(p.staminaExpectedProfit,1)} G/体</td>
       <td class="stamina-cell" style="color:var(--gold);">${fmtDec(p.staminaExpectedLow,1)} G/体</td>
       <td>
         <button class="btn btn-xs" style="padding:1px 4px;font-size:0.6rem;" onclick="editProductSellPrice('${p.id}')" title="快速改售价">💰</button>
@@ -1478,6 +1477,15 @@ function onTrendCatChange() {
   itemSel.innerHTML = '<option value="">-- 选择物品 --</option>';
   if (!catVal) { renderTrendChart(); return; }
   
+  if (catVal === 'treasure') {
+    var o = document.createElement('option');
+    o.value = 'treasure_treasure';
+    o.textContent = '宝图残片 (' + (data.treasurePrice||0) + ' G)';
+    itemSel.appendChild(o);
+    renderTrendChart();
+    return;
+  }
+  
   const [type, cat] = catVal.split('-');
   let items = [];
   if (type === 'prod') {
@@ -1648,11 +1656,24 @@ let freightPresets = [];    // synced
 let freightSlots = [null,null,null,null,null,null,null,null]; // local only
 let treasurePrice = 0;     // synced
 
-function updateTreasureModInfo() { var ph = (data.priceHistory||{})["treasure_treasure"]; var e = document.getElementById("treasureModInfo"); if (e && ph && ph.length) { var d = new Date(ph[ph.length-1].date); e.textContent = "最后修改："+(d.getMonth()+1)+"-"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); var p = ph.length>1?ph[ph.length-2].price:null; if(p) e.textContent += "，"+p+" → "+ph[ph.length-1].price+" G"; } }
+function updateTreasureModInfo() {
+  var ph = (data.priceHistory||{})["treasure_treasure"];
+  var e = document.getElementById("treasureModInfo");
+  if (!e) return;
+  if (ph && ph.length) {
+    var d = new Date(ph[ph.length-1].date);
+    var s = (d.getMonth()+1)+"-"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+    var p = ph.length>1?ph[ph.length-2].price:null;
+    e.innerHTML = s + (p ? "，" + p + " → " + ph[ph.length-1].price + " G" : "");
+  } else {
+    e.innerHTML = "暂无记录";
+  }
+}
 function loadFreightData() {
   if (data.freightPresets) freightPresets = data.freightPresets;
   treasurePrice = data.treasurePrice || 0;
   document.getElementById('treasurePrice').value = treasurePrice;
+  updateTreasureModInfo();
   // Load local slots
   try { const s = localStorage.getItem('freight_slots'); if (s) freightSlots = JSON.parse(s); } catch(e) {}
   renderFreight();
@@ -1978,17 +1999,18 @@ if (nickname) document.getElementById("nickDisplay").textContent = "\u{1F464} " 
 initCloud();
 if (cloudEnabled) {
   cloudListen();
-  cloudLoad().then(d => { if (d) { data = d; loadFreightData(); saveData(); renderAll(); } });
-  // Restore doubleChance from localStorage
-  try { var dc = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); data.products.forEach(function(p) { if (dc[p.id] !== undefined) p.doubleChance = dc[p.id]; }); } catch(e) {}
+  cloudLoad().then(d => {
+    if (d) {
+      data = d;
+      // 恢复本地 doubleChance（不从云端覆盖）
+      try { var dc = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); data.products.forEach(function(p) { if (dc[p.id] !== undefined) p.doubleChance = dc[p.id]; }); } catch(e) {}
+      loadFreightData();
+      renderAll();
+    }
+  });
   // 记录访问日志
   fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{
-    const ip = d.ip;
-    fetch('https://ipapi.co/' + ip + '/json/').then(r=>r.json()).then(geo => {
-      sbClient.from('visits').insert({ip:ip, user_agent:navigator.userAgent, country:geo.country_name, region:geo.region, city:geo.city}).then(()=>{});
-    }).catch(()=>{
-      sbClient.from('visits').insert({ip:ip, user_agent:navigator.userAgent}).then(()=>{});
-    });
+    sbClient.from('visits').insert({ip:d.ip, user_agent:navigator.userAgent}).then(()=>{});
   }).catch(()=>{});
 }
 </script>
