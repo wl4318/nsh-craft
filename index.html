@@ -586,7 +586,8 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
         <h2 style="display:flex;align-items:center;gap:6px;">🚚 高级帮会货运</h2>
         <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <label style="font-size:0.75rem;color:var(--text-dim);">宝图残片售价:</label>
-          <span class="info-tip" id="treasureTip" style="font-size:0.7rem;margin-right:4px;">ℹ<span class="tip-popup" id="treasureModInfo"></span></span><input type="number" id="treasurePrice" value="0" min="1" step="1" style="width:80px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="saveTreasurePrice()">
+          <span class="info-tip" id="treasureTip" style="font-size:0.7rem;margin-right:4px;">ℹ<span class="tip-popup" id="treasureModInfo"></span></span><input type="number" id="treasurePrice" value="0" min="1" step="1" style="width:80px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="saveTreasurePrice()"> G
+          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:6px;">悲观:</label> <input type="number" id="pessimisticRate" value="90" min="50" max="100" step="1" style="width:50px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="savePessimisticRate()">%
           G
           <button class="btn btn-primary btn-sm" onclick="calcFreight()">📊 计算最优</button>
         </span>
@@ -1392,9 +1393,12 @@ function importData(event) {
       // Migrate old data
       imp.playerMaterials.forEach(m => { if (!m.category) m.category = 'potion'; });
       imp.products.forEach(p => { if (!p.category) p.category = 'potion'; });
-      if (!confirm(`即将导入 ${imp.systemMaterials.length} 系统材料、${imp.playerMaterials.length} 玩家材料、${imp.products.length} 产物。当前数据将被覆盖！`)) return;
+      if (!imp.freightPresets) imp.freightPresets = [];
+      if (imp.treasurePrice === undefined) imp.treasurePrice = 0;
+      if (!imp.priceHistory) imp.priceHistory = {};
+      if (!confirm(`即将导入 ${imp.systemMaterials.length} 系统材料、${imp.playerMaterials.length} 玩家材料、${imp.products.length} 产物、${imp.freightPresets.length} 货运方案。当前数据将被覆盖！`)) return;
       data = imp;
-      saveData(); renderAll(); toast('数据导入成功');
+      saveData(); loadFreightData(); renderAll(); toast('数据导入成功');
     } catch(err) { toast('导入失败：数据格式不正确','error'); }
   };
   reader.readAsText(file);
@@ -1654,7 +1658,8 @@ document.addEventListener('keydown', function(e) {
 // ==================== FREIGHT ====================
 let freightPresets = [];    // synced
 let freightSlots = [null,null,null,null,null,null,null,null]; // local only
-let treasurePrice = 0;     // synced
+let treasurePrice = 0;
+let pessimisticRate = 90; // default 90%     // synced
 
 function updateTreasureModInfo() {
   var ph = (data.priceHistory||{})["treasure_treasure"];
@@ -1672,11 +1677,18 @@ function updateTreasureModInfo() {
 function loadFreightData() {
   if (data.freightPresets) freightPresets = data.freightPresets;
   treasurePrice = data.treasurePrice || 0;
+  pessimisticRate = parseInt(localStorage.getItem("pessimisticRate")) || 90;
+  document.getElementById("pessimisticRate").value = pessimisticRate;
   document.getElementById('treasurePrice').value = treasurePrice;
   updateTreasureModInfo();
   // Load local slots
   try { const s = localStorage.getItem('freight_slots'); if (s) freightSlots = JSON.parse(s); } catch(e) {}
   renderFreight();
+}
+
+function savePessimisticRate() {
+  pessimisticRate = parseInt(document.getElementById("pessimisticRate").value) || 90;
+  localStorage.setItem("pessimisticRate", pessimisticRate);
 }
 
 function saveTreasurePrice() {
@@ -1806,13 +1818,20 @@ function calcFreight() {
     const craftProfit = income - craftCost - oppCost;
     const better = directProfit >= craftProfit ? 'buy' : 'craft';
     const betterProfit = Math.max(directProfit, craftProfit);
+    // Pessimistic: treasure 90%, cost ×1.01
+    const pessRate = (parseInt(localStorage.getItem("pessimisticRate")) || 90) / 100;
+    const pessIncome = Math.floor(treasureIncome * pessRate) * (slot.rewardQty || 3);
+    const pessDirectProfit = pessIncome - Math.floor(directCost * 1.01);
+    const pessCraftProfit = pessIncome - Math.floor(craftCost * 1.01) - oppCost;
+    const pessBetterProfit = Math.max(pessDirectProfit, pessCraftProfit);
     
     return {
       ...slot,
       valid: true,
       directProfit, craftProfit, better, betterProfit,
       directCost, craftCost, staminaCost, oppCost,
-      prodName: prod.name, sellPrice: prod.sellPrice, treasureIncome: income
+      prodName: prod.name, sellPrice: prod.sellPrice, treasureIncome: income,
+      pessBetterProfit
     };
   });
   
@@ -1823,12 +1842,15 @@ function calcFreight() {
   const scenarios = [5,6,7,8].filter(n => n <= results.length).map(n => {
     const selected = results.slice(0, n);
     const totalProfit = selected.reduce((s,r) => s + r.betterProfit, 0);
+    const pessTotal = selected.reduce((s,r) => s + (r.pessBetterProfit||0), 0);
     const bonus = bonusMap[n] * treasureIncome;
-    return { n, totalProfit, bonus, grandTotal: totalProfit + bonus };
+    const pessBonus = bonusMap[n] * Math.floor(treasureIncome * ((parseInt(localStorage.getItem("pessimisticRate"))||90)/100));
+    return { n, totalProfit, bonus, grandTotal: totalProfit + bonus, pessTotal, pessBonus, pessGrand: pessTotal + pessBonus };
   });
   
-  // Find best
+  // Find best for both normal and pessimistic
   const best = scenarios.reduce((a,b) => b.grandTotal > a.grandTotal ? b : a, scenarios[0]);
+  const bestPess = scenarios.reduce((a,b) => b.pessGrand > a.pessGrand ? b : a, scenarios[0]);
   
   // Mark order on slots
   freightSlots.forEach(s => { if (s) delete s.order; });
@@ -1844,22 +1866,29 @@ function calcFreight() {
   // Show summary
   const summary = document.getElementById('freightSummary');
   summary.style.display = 'block';
-  summary.innerHTML = '<b>📊 计算结果</b>（体力机会成本：' + fmtDec(top3Avg,1) + ' G/体）<br>' +
+  summary.innerHTML = '<b>📊 计算结果</b>（体力机会成本：' + fmtDec(top3Avg,1) + ' G/体）&nbsp; 悲观=残片×0.9 成本×1.01<br>' +
     '<table style="font-size:0.75rem;">' + results.map((r, i) => {
       const marker = i < best.n ? '✅ 第' + (i+1) + '名' : '❌ 跳过';
-      const buyStr = '买：' + (r.directProfit>=0?'+':'') + fmtGold(r.directProfit);
-      const craftStr = '搓：' + (r.craftProfit>=0?'+':'') + fmtGold(r.craftProfit);
-      const buyDetail = '残片' + fmtGold(r.treasureIncome||0) + ' − 买' + r.qty + '个×' + fmtGold(r.sellPrice) + ' = ' + (r.directProfit>=0?'+':'') + fmtGold(r.directProfit);
-      const craftDetail = '残片' + fmtGold(r.treasureIncome||0) + ' − 原料' + fmtGold(r.craftCost/r.qty) + '×' + r.qty + ' − 体力' + fmtGold(r.oppCost) + ' = ' + (r.craftProfit>=0?'+':'') + fmtGold(r.craftProfit);
+      const buyStr = '' + (r.directProfit>=0?'+':'') + fmtGold(r.directProfit);
+      const craftStr = '' + (r.craftProfit>=0?'+':'') + fmtGold(r.craftProfit);
+      const bestStr = '' + (r.betterProfit>=0?'+':'') + fmtGold(r.betterProfit);
+      const pessStr = '' + ((r.pessBetterProfit||0)>=0?'+':'') + fmtGold(r.pessBetterProfit||0);
+      const buyDetail = '残片' + fmtGold(r.treasureIncome||0) + ' − 买' + r.qty + '个×' + fmtGold(r.sellPrice) + ' = ' + buyStr;
+      const craftDetail = '残片' + fmtGold(r.treasureIncome||0) + ' − 原料' + fmtGold(r.craftCost/r.qty) + '×' + r.qty + ' − 体力' + fmtGold(r.oppCost) + ' = ' + craftStr;
       const buyColor = r.better === 'buy' ? 'color:var(--gold);font-weight:700;' : 'color:var(--text-dim);';
       const craftColor = r.better === 'craft' ? 'color:var(--gold);font-weight:700;' : 'color:var(--text-dim);';
-      return '<tr><td>' + marker + '</td><td>' + esc(r.prodName) + ' ×' + r.qty + '</td><td style="' + buyColor + '" title="' + buyDetail + '">' + buyStr + '</td><td style="' + craftColor + '" title="' + craftDetail + '">' + craftStr + '</td></tr>';
+      return '<tr><td>' + marker + '</td><td>' + esc(r.prodName) + ' ×' + r.qty + '</td><td style="' + buyColor + '" title="' + buyDetail + '">买' + buyStr + '</td><td style="' + craftColor + '" title="' + craftDetail + '">搓' + craftStr + '</td><td style="color:var(--gold);font-weight:700;">' + bestStr + '</td><td style="color:var(--text-dim);">' + pessStr + '</td></tr>';
     }).join('') + '</table>' +
     '<div style="margin-top:6px;"><b>方案汇总：</b></div>' +
     scenarios.map(s => {
       const selected = results.slice(0, s.n);
       const totalCost = selected.reduce((sum, r) => sum + (r.better === 'buy' ? r.directCost : (r.craftCost + r.oppCost)), 0);
-      return '<div>' + s.n + '个：总消耗 ' + fmtGold(totalCost) + ' − 残片收入 ' + fmtGold(s.totalProfit + s.bonus + totalCost) + '（含奖励） = <b style="color:var(--gold);">' + fmtGold(s.grandTotal) + ' G</b>' + (s.n === best.n ? ' ⭐最优' : '') + '</div>';
+      var allNormalNeg = scenarios.every(function(x){return x.grandTotal <= 0;});
+      var allPessNeg = scenarios.every(function(x){return x.pessGrand <= 0;});
+      var profitRate = totalCost > 0 ? (s.grandTotal / totalCost * 100) : 0;
+      var normalLabel = s.n === best.n ? (allNormalNeg ? ' 💸不要再赚啦！' : ' ⭐正常最优' + (profitRate < 10 ? ' 🎲别赌了哥' : '')) : '';
+      var pessLabel = s.n === bestPess.n ? (allPessNeg ? ' 🚫收手吧阿祖' : ' ⭐悲观最优') : '';
+      return '<div>' + s.n + '个：残片收入 ' + fmtGold(s.totalProfit + s.bonus + totalCost) + '（含奖励） − 总消耗 ' + fmtGold(totalCost) + ' = <span style="display:inline-block;width:240px;"><b style="color:var(--gold);">' + fmtGold(s.grandTotal) + ' G</b>' + normalLabel + '</span> &nbsp;|&nbsp; <span style="display:inline-block;width:180px;">悲观 <b style="color:var(--text-dim);">' + fmtGold(s.pessGrand) + ' G</b>' + pessLabel + '</span></div>';
     }).join('');
   
   toast('推荐完成 ' + best.n + ' 个，总收益 ' + fmtGold(best.grandTotal) + ' G');
