@@ -687,7 +687,7 @@ async function cloudSave(d) {
   if (!cloudEnabled || !sbClient) return;
   try {
     var uploadData = JSON.parse(JSON.stringify(d));
-    uploadData.products.forEach(function(p) { delete p.doubleChance; });
+    // uploadData.products.forEach(function(p) { delete p.doubleChance; });
     await sbClient.from('game_data').upsert({ id: 'v2', data: uploadData, updated_at: new Date().toISOString() });
   } catch(e) {}
 }
@@ -2074,14 +2074,21 @@ initCloud();
 if (cloudEnabled) {
   cloudListen();
   cloudLoad().then(d => {
-    if (d) {
-      data = d;
-      // 恢复本地 doubleChance（不从云端覆盖）
-      try { var dc = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); data.products.forEach(function(p) { if (dc[p.id] !== undefined) p.doubleChance = dc[p.id]; }); } catch(e) {}
-      loadFreightData();
-      renderAll();
-    }
-  });
+  if (d) {
+    data = d;
+    // 如果云端数据没有 doubleChance（兼容旧数据），则从本地恢复
+    try { 
+      var dc = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); 
+      data.products.forEach(function(p) { 
+        if (p.doubleChance === undefined && dc[p.id] !== undefined) {
+          p.doubleChance = dc[p.id]; 
+        }
+      }); 
+    } catch(e) {}
+    loadFreightData();
+    renderAll();
+  }
+});
   // 记录访问日志
   fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{
     sbClient.from('visits').insert({ip:d.ip, user_agent:navigator.userAgent}).then(()=>{});
