@@ -588,6 +588,8 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
           <label style="font-size:0.75rem;color:var(--text-dim);">宝图残片售价:</label>
           <span class="info-tip" id="treasureTip" style="font-size:0.7rem;margin-right:4px;">ℹ<span class="tip-popup" id="treasureModInfo"></span></span><input type="number" id="treasurePrice" value="0" min="1" step="1" style="width:80px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="saveTreasurePrice()"> G
           <label style="font-size:0.7rem;color:var(--text-dim);margin-left:6px;">悲观:</label> <input type="number" id="pessimisticRate" value="90" min="50" max="100" step="1" style="width:50px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="savePessimisticRate()">%
+          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">乾坤寻宝图:</label> <input type="number" id="kunPrice" value="0" min="1" step="1" style="width:80px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="saveKunPrice()"> G
+          <label style="font-size:0.7rem;color:var(--text-dim);">比例:</label> <input type="number" id="kunRate" value="97.5" min="50" max="100" step="0.1" style="width:55px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="saveKunRate()">%
           G
           <button class="btn btn-primary btn-sm" onclick="calcFreight()">📊 计算最优</button>
         </span>
@@ -687,7 +689,7 @@ async function cloudSave(d) {
   if (!cloudEnabled || !sbClient) return;
   try {
     var uploadData = JSON.parse(JSON.stringify(d));
-    // uploadData.products.forEach(function(p) { delete p.doubleChance; });
+    uploadData.products.forEach(function(p) { delete p.doubleChance; });
     await sbClient.from('game_data').upsert({ id: 'v2', data: uploadData, updated_at: new Date().toISOString() });
   } catch(e) {}
 }
@@ -1659,7 +1661,9 @@ document.addEventListener('keydown', function(e) {
 let freightPresets = [];    // synced
 let freightSlots = [null,null,null,null,null,null,null,null]; // local only
 let treasurePrice = 0;
-let pessimisticRate = 90; // default 90%     // synced
+let pessimisticRate = 90;
+let kunPrice = 0;
+let kunRate = 97.5;     // synced
 
 function updateTreasureModInfo() {
   var ph = (data.priceHistory||{})["treasure_treasure"];
@@ -1679,6 +1683,10 @@ function loadFreightData() {
   treasurePrice = data.treasurePrice || 0;
   pessimisticRate = parseInt(localStorage.getItem("pessimisticRate")) || 90;
   document.getElementById("pessimisticRate").value = pessimisticRate;
+  kunPrice = parseInt(localStorage.getItem("kunPrice")) || 0;
+  document.getElementById("kunPrice").value = kunPrice;
+  kunRate = parseFloat(localStorage.getItem("kunRate")) || 97.5;
+  document.getElementById("kunRate").value = kunRate;
   document.getElementById('treasurePrice').value = treasurePrice;
   updateTreasureModInfo();
   // Load local slots
@@ -1694,6 +1702,16 @@ function loadFreightData() {
 function savePessimisticRate() {
   pessimisticRate = parseInt(document.getElementById("pessimisticRate").value) || 90;
   localStorage.setItem("pessimisticRate", pessimisticRate);
+}
+
+function saveKunPrice() {
+  kunPrice = parseInt(document.getElementById("kunPrice").value) || 0;
+  localStorage.setItem("kunPrice", kunPrice);
+}
+
+function saveKunRate() {
+  kunRate = parseFloat(document.getElementById("kunRate").value) || 97.5;
+  localStorage.setItem("kunRate", kunRate);
 }
 
 function saveTreasurePrice() {
@@ -1841,6 +1859,8 @@ function calcFreight() {
   if (!active.length) { toast('请先填充至少一个槽位','error'); return; }
   
   const treasureIncome = taxIncome(treasurePrice); // single fragment after-tax
+  // 乾坤寻宝图对应残片价（仅展示对比，不参与主要计算）
+  const kunFragmentPrice = kunPrice > 0 ? Math.floor(taxIncome(kunPrice) * (kunRate / 100) / 30) : 0;
   const bonusMap = { 5: 18, 6: 22, 7: 28, 8: 35 };
   
   // Get top 3 staminaExpectedProfit from products
@@ -1923,16 +1943,24 @@ function calcFreight() {
       const craftColor = r.better === 'craft' ? 'color:var(--gold);font-weight:700;' : 'color:var(--text-dim);';
       return '<tr><td>' + marker + '</td><td>' + esc(r.prodName) + ' ×' + r.qty + '</td><td style="' + buyColor + '" title="' + buyDetail + '">买' + buyStr + '</td><td style="' + craftColor + '" title="' + craftDetail + '">搓' + craftStr + '</td><td style="color:var(--gold);font-weight:700;">' + bestStr + '</td><td style="color:var(--text-dim);">' + pessStr + '</td></tr>';
     }).join('') + '</table>' +
-    '<div style="margin-top:6px;"><b>方案汇总：</b></div>' +
+    '<div style="margin-top:6px;"><b>方案汇总：</b>' + (kunFragmentPrice > treasureIncome ? '<span style="font-size:0.72rem;color:var(--cyan);">💡 乾坤寻宝图=⌊' + fmtGold(kunPrice) + '×0.95⌋×' + kunRate + '%÷30≈' + fmtGold(kunFragmentPrice) + '/残片，比直接卖(' + fmtGold(treasureIncome) + ')更高</span><br>' : '') + '</div>' +
     scenarios.map(s => {
       const selected = results.slice(0, s.n);
       const totalCost = selected.reduce((sum, r) => sum + (r.better === 'buy' ? r.directCost : (r.craftCost + r.oppCost)), 0);
+      // Kun-based income
+      var kunIncome = 0;
+      if (kunFragmentPrice > treasureIncome) {
+        var kunFragTotal = kunFragmentPrice * selected.reduce((s2, r2) => s2 + (r2.rewardQty||3), 0);
+        var kunBonus = bonusMap[s.n] * kunFragmentPrice;
+        kunIncome = kunFragTotal + kunBonus;
+      }
+      var kunNet = kunIncome > 0 ? kunIncome - totalCost : null;
       var allNormalNeg = scenarios.every(function(x){return x.grandTotal <= 0;});
       var allPessNeg = scenarios.every(function(x){return x.pessGrand <= 0;});
       var profitRate = totalCost > 0 ? (s.grandTotal / totalCost * 100) : 0;
       var normalLabel = s.n === best.n ? (allNormalNeg ? ' 💸不要再赚啦！' : ' ⭐正常最优' + (profitRate < 10 ? ' 🎲别赌了哥' : '')) : '';
       var pessLabel = s.n === bestPess.n ? (allPessNeg ? ' 🚫收手吧阿祖' : ' ⭐悲观最优') : '';
-      return '<div>' + s.n + '个：残片收入 ' + fmtGold(s.totalProfit + s.bonus + totalCost) + '（含奖励） − 总消耗 ' + fmtGold(totalCost) + ' = <span style="display:inline-block;width:240px;"><b style="color:var(--gold);">' + fmtGold(s.grandTotal) + ' G</b>' + normalLabel + '</span> &nbsp;|&nbsp; <span style="display:inline-block;width:180px;">悲观 <b style="color:var(--text-dim);">' + fmtGold(s.pessGrand) + ' G</b>' + pessLabel + '</span></div>';
+      return '<div>' + s.n + '个：残片收入 ' + fmtGold(s.totalProfit + s.bonus + totalCost) + '（含奖励）' + (kunIncome > 0 ? '（乾坤价收入=' + fmtGold(kunIncome) + '）' : '') + ' − 总消耗 ' + fmtGold(totalCost) + ' = <span style="display:inline-block;width:280px;"><b style="color:var(--gold);">' + fmtGold(s.grandTotal) + ' G</b>' + (kunNet != null ? ' <span style="font-size:0.72rem;color:var(--cyan);">（'+ (kunNet>=0?'+':'') + fmtGold(kunNet) + '）</span>' : '') + normalLabel + '</span> &nbsp;&nbsp;|&nbsp;&nbsp; <span style="display:inline-block;width:220px;">悲观 <b style="color:var(--text-dim);">' + fmtGold(s.pessGrand) + ' G</b>' + pessLabel + '</span></div>';
     }).join('');
   
   toast('推荐完成 ' + best.n + ' 个，总收益 ' + fmtGold(best.grandTotal) + ' G');
@@ -2074,21 +2102,14 @@ initCloud();
 if (cloudEnabled) {
   cloudListen();
   cloudLoad().then(d => {
-  if (d) {
-    data = d;
-    // 如果云端数据没有 doubleChance（兼容旧数据），则从本地恢复
-    try { 
-      var dc = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); 
-      data.products.forEach(function(p) { 
-        if (p.doubleChance === undefined && dc[p.id] !== undefined) {
-          p.doubleChance = dc[p.id]; 
-        }
-      }); 
-    } catch(e) {}
-    loadFreightData();
-    renderAll();
-  }
-});
+    if (d) {
+      data = d;
+      // 恢复本地 doubleChance（不从云端覆盖）
+      try { var dc = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); data.products.forEach(function(p) { if (dc[p.id] !== undefined) p.doubleChance = dc[p.id]; }); } catch(e) {}
+      loadFreightData();
+      renderAll();
+    }
+  });
   // 记录访问日志
   fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{
     sbClient.from('visits').insert({ip:d.ip, user_agent:navigator.userAgent}).then(()=>{});
