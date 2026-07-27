@@ -1816,8 +1816,15 @@ function clearFreightSlot(idx) {
 }
 
 function addFreightPreset() {
-  const prods = data.products.filter(p => p.category === "cultivate");
-  if (!prods.length) { toast('请先在产物列表中添加养成材料类产物','error'); return; }
+  const prods = data.products.sort(function(a, b) {
+    var scoreA = 0, scoreB = 0;
+    if (a.category === 'cultivate') scoreA = 2;
+    else if (a.name.startsWith('中品')) scoreA = 1;
+    if (b.category === 'cultivate') scoreB = 2;
+    else if (b.name.startsWith('中品')) scoreB = 1;
+    return scoreB - scoreA;
+  });
+  if (!prods.length) { toast('请先在产物列表中添加产物','error'); return; }
   let m = document.createElement('div');
   m.className = 'modal-mask';
   m.innerHTML = '<div class="modal-box" style="max-width:380px;"><h3>添加货运方案</h3>' +
