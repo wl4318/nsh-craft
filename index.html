@@ -82,7 +82,23 @@ body {
 .btn-danger { color: var(--red); border-color: #5a3040; }
 .btn-danger:hover { background: #3a2028; border-color: var(--red); }
 .btn-sm { padding: 4px 10px; font-size: 0.78rem; }
-.btn-xs { padding: 1px 5px; font-size: 0.65rem; border-radius: 3px; }
+.btn-xs { padding: 3px 8px; font-size: 0.72rem; border-radius: 4px; min-height: 24px; }
+/* Small delete buttons stay compact (rarely used, avoid mis-taps) */
+.btn-del {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 2px 6px; font-size: 0.72rem; border-radius: 3px;
+  min-width: 22px; min-height: 22px; line-height: 1;
+}
+/* Larger, easy-to-hit icon buttons (price edit / delete / quick actions) */
+.btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; min-height: 30px; padding: 4px 6px;
+  font-size: 0.8rem; border-radius: var(--radius-sm); line-height: 1;
+}
+@media (pointer: coarse) {
+  .btn-icon { min-width: 40px; min-height: 40px; font-size: 0.9rem; }
+  .btn-xs { min-height: 32px; padding: 4px 10px; }
+}
 
 /* ========== Layout ========== */
 .main-container {
@@ -109,7 +125,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .card-header h2 {
-  font-size: 0.95rem; font-weight: 700; color: var(--text-bright);
+  font-size: 1rem; font-weight: 700; color: var(--text-bright);
   display: flex; align-items: center; gap: 7px;
 }
 .card-header h2 .dot {
@@ -118,19 +134,6 @@ body {
 .dot-potion { background: var(--potion); }
 .dot-cultivate { background: var(--cultivate); }
 .dot-system { background: var(--blue); }
-
-/* ========== Collapsible ========== */
-.collapse-toggle {
-  cursor: pointer; user-select: none;
-  display: flex; align-items: center; gap: 6px;
-}
-.collapse-toggle .arrow {
-  transition: transform 0.2s; font-size: 0.7rem; color: var(--text-dim);
-}
-.collapse-toggle .arrow.open { transform: rotate(90deg); }
-.collapse-body { overflow: hidden; transition: max-height 0.3s ease; }
-.collapse-body.hidden { max-height: 0 !important; }
-.collapse-body.visible { max-height: 600px; }
 
 /* ========== Material List ========== */
 .material-list { max-height: 400px; overflow-y: auto; overflow-x: auto; }
@@ -142,7 +145,7 @@ body {
 }
 .material-item:hover { background: rgba(255,255,255,0.03); border-color: var(--border); }
 .material-item .name {
-  flex: 1; min-width: 50px; font-weight: 600; font-size: 0.78rem;
+  flex: 1; min-width: 50px; font-weight: 600; font-size: 0.85rem;
   color: var(--text-bright);
 }
 .material-item .price {
@@ -152,7 +155,7 @@ body {
 .material-item .price .unit { font-size: 0.65rem; color: var(--text-dim); margin-left: 1px; }
 .material-item .actions { display: flex; gap: 2px; }
 .material-item .tag {
-  font-size: 0.58rem; padding: 1px 5px; border-radius: 10px;
+  font-size: 0.62rem; padding: 1px 6px; border-radius: 10px;
   font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
 }
 .tag-system { background: rgba(91,155,213,0.2); color: var(--tag-system); }
@@ -161,9 +164,9 @@ body {
 
 /* ========== Inline Edit ========== */
 .inline-price-input {
-  width: 68px; padding: 2px 5px; border-radius: 3px;
+  width: 84px; min-height: 30px; padding: 4px 6px; border-radius: 4px;
   border: 1px solid var(--border); background: var(--bg-input);
-  color: var(--gold); font-weight: 700; font-size: 0.78rem;
+  color: var(--gold); font-weight: 700; font-size: 0.88rem;
   text-align: right; font-family: inherit;
 }
 .inline-price-input:focus { outline: none; border-color: var(--gold); }
@@ -179,9 +182,9 @@ input[type=number] { -moz-appearance: textfield; }
   padding-top: 8px; border-top: 1px solid var(--border);
 }
 .add-form input, .add-form select {
-  padding: 5px 7px; border-radius: var(--radius-sm);
+  padding: 6px 8px; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--bg-input);
-  color: var(--text); font-size: 0.78rem; font-family: inherit;
+  color: var(--text); font-size: 0.85rem; font-family: inherit;
   min-width: 0;
 }
 .add-form input:focus, .add-form select:focus { outline: none; border-color: var(--border-focus); }
@@ -191,14 +194,14 @@ input[type=number] { -moz-appearance: textfield; }
 /* ========== Products Table ========== */
 .table-wrapper { overflow-x: auto; margin-top: 6px; }
 table {
-  width: 100%; border-collapse: collapse; font-size: 0.88rem;
+  width: 100%; border-collapse: collapse; font-size: 0.9rem;
   table-layout: auto;
 }
 thead th {
-  padding: 9px 7px; text-align: right; font-weight: 700;
+  padding: 9px 6px; text-align: right; font-weight: 700;
   color: var(--text-dim); border-bottom: 2px solid var(--border);
   white-space: nowrap; cursor: pointer; user-select: none;
-  transition: color 0.15s; position: relative; font-size: 0.82rem;
+  transition: color 0.15s; position: relative; font-size: 0.84rem;
 }
 thead th:first-child { text-align: left; }
 thead th:hover { color: var(--text-bright); }
@@ -206,7 +209,7 @@ thead th .sort-arrow { font-size: 0.65rem; margin-left: 2px; opacity: 0.4; }
 thead th.sorted .sort-arrow { opacity: 1; color: var(--gold); }
 thead th.sorted { color: var(--gold); }
 tbody td {
-  padding: 8px 7px; text-align: right;
+  padding: 9px 6px; text-align: right;
   border-bottom: 1px solid rgba(255,255,255,0.04);
   white-space: nowrap;
 }
@@ -221,12 +224,6 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
 .income-cell { color: var(--cyan); }
 .stamina-cell { color: var(--purple); }
 
-.ingredients-mini {
-  font-size: 0.7rem; color: var(--text-dim);
-  max-width: 140px; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* ========== Product Form ========== */
 .product-form {
   display: grid; grid-template-columns: 1fr 1fr;
@@ -235,13 +232,13 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
 }
 .product-form .full-width { grid-column: 1 / -1; }
 .product-form label {
-  font-size: 0.76rem; font-weight: 600; color: var(--text-dim);
+  font-size: 0.8rem; font-weight: 600; color: var(--text-dim);
   display: block; margin-bottom: 2px;
 }
 .product-form input, .product-form select {
-  width: 100%; padding: 7px 10px; border-radius: var(--radius-sm);
+  width: 100%; padding: 8px 10px; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--bg-input);
-  color: var(--text); font-size: 0.85rem; font-family: inherit;
+  color: var(--text); font-size: 0.9rem; font-family: inherit;
 }
 .product-form input:focus, .product-form select:focus {
   outline: none; border-color: var(--border-focus);
@@ -264,8 +261,8 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
   border-radius: var(--radius-sm); padding: 7px 12px;
   text-align: center; flex: 1; min-width: 80px;
 }
-.stat-item .stat-value { font-size: 1rem; font-weight: 700; color: var(--gold); }
-.stat-item .stat-label { font-size: 0.68rem; color: var(--text-dim); margin-top: 1px; }
+.stat-item .stat-value { font-size: 1.1rem; font-weight: 700; color: var(--gold); }
+.stat-item .stat-label { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
 
 /* ========== Toast ========== */
 .toast {
@@ -292,14 +289,6 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
   font-size: 0.75rem; border-top: 1px solid var(--border);
 }
 
-/* ========== Category Badge ========== */
-.cat-badge {
-  display: inline-block; font-size: 0.65rem; padding: 2px 8px;
-  border-radius: 10px; font-weight: 700;
-}
-.cat-badge-potion { background: rgba(224,85,106,0.2); color: var(--potion); }
-.cat-badge-cultivate { background: rgba(123,159,212,0.2); color: var(--cultivate); }
-
 /* ========== Drag & Drop ========== */
 .drag-card { cursor: grab; transition: opacity 0.15s, box-shadow 0.15s; }
 .drag-card:active { cursor: grabbing; }
@@ -307,7 +296,6 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
 .drag-card.drag-over { border-color: var(--gold) !important; box-shadow: 0 0 16px rgba(226,176,74,0.25); }
 .drag-handle { cursor: grab; }
 .drag-handle:active { cursor: grabbing; }
-.drag-zone { min-height: 10px; transition: all 0.2s; }
 
 
 /* ========== Freight Card ========== */
@@ -319,7 +307,8 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
   display: flex; align-items: center; justify-content: center; flex-direction: column;
 }
 .freight-slot:hover { border-color: var(--border-focus); background: rgba(255,255,255,0.03); }
-.freight-slot.filled { border-style: solid; border-color: var(--gold); cursor: default; }
+.freight-slot.filled { border-style: solid; border-color: var(--gold); cursor: pointer; }
+.freight-slot.picking { border-color: var(--cyan); background: rgba(62,201,192,0.08); }
 .freight-slot .slot-num {
   position: absolute; top: 3px; left: 6px; font-size: 0.7rem; color: var(--gold);
   font-weight: 700; display: none;
@@ -328,7 +317,7 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
 .freight-slot .slot-name { font-size: 0.78rem; font-weight: 600; color: var(--text-bright); }
 .freight-slot .slot-detail { font-size: 0.68rem; color: var(--text-dim); margin-top: 2px; }
 .freight-slot .slot-profit { font-size: 0.72rem; font-weight: 700; margin-top: 2px; }
-.freight-slot .slot-clear { position: absolute; top: 3px; right: 5px; cursor: pointer; color: var(--text-dim); font-size: 0.7rem; display: none; }
+.freight-slot .slot-clear { position: absolute; top: 3px; right: 5px; cursor: pointer; color: var(--text-dim); font-size: 0.7rem; line-height: 1; padding: 1px; display: none; }
 .freight-slot.filled .slot-clear { display: block; }
 .freight-slot .slot-clear:hover { color: var(--red); }
 
@@ -350,9 +339,7 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
 #trendChartContainer { position: relative; }
 #trendChartCanvas { width: 100% !important; }
 #trendItemSelect { max-width: 220px; }
-.main-container > div:last-child {
-  min-width: 0; overflow-x: auto;
-}
+.main-container > div:last-child { min-width: 0; }
 
 /* ========== Themes ========== */
 body[data-theme="light"] {
@@ -378,10 +365,29 @@ body[data-compact="true"] .main-container { gap: 8px; padding: 10px; }
 body[data-compact="true"] .card { padding: 10px; margin-bottom: 8px; }
 body[data-compact="true"] .card-header { margin-bottom: 6px; padding-bottom: 6px; }
 body[data-compact="true"] .card-header h2 { font-size: 0.85rem; }
-body[data-compact="true"] table { font-size: 1.2rem; }
-body[data-compact="true"] thead th { padding: 6px 5px; }
-body[data-compact="true"] tbody td { padding: 5px 5px; }
+body[data-compact="true"] table { font-size: 0.8rem; width: 100%; }
+body[data-compact="true"] thead th { padding: 5px 4px; }
+body[data-compact="true"] tbody td { padding: 5px 4px; }
+/* Compact mode: drop rarely-needed columns so the table stays tight */
+body[data-compact="true"] th[data-col="cost"],
+body[data-compact="true"] td[data-col="cost"],
+body[data-compact="true"] th[data-col="profitRate"],
+body[data-compact="true"] td[data-col="profitRate"] { display: none; }
+/* Let the product-name column absorb leftover width: numeric columns stay tight, no right-side gap */
+body[data-compact="true"] th[data-col="name"],
+body[data-compact="true"] td[data-col="name"] { width: 100%; }
+/* Keep icon/delete buttons genuinely small in compact mode (override .btn padding) */
+body[data-compact="true"] .btn-icon {
+  min-width: 22px; min-height: 22px; padding: 2px 3px; font-size: 0.72rem;
+}
+body[data-compact="true"] .btn-del {
+  min-width: 18px; min-height: 18px; padding: 1px 4px; font-size: 0.68rem;
+}
 body[data-compact="true"] .material-item { padding: 4px 6px; }
+body[data-compact="true"] .material-item .price { font-size: 1.1rem; min-width: 40px; }
+body[data-compact="true"] .inline-price-input {
+  width: 64px; min-height: 24px; padding: 2px 4px; font-size: 0.8rem;
+}
 body[data-compact="true"] .material-list { max-height: 280px; }
 body[data-compact="true"] .add-form { margin-top: 4px; padding-top: 4px; gap: 3px; }
 body[data-compact="true"] .header { padding: 8px 16px; }
@@ -397,6 +403,15 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
   font-family: inherit; cursor: pointer;
 }
 
+/* Compact inline controls (trend select, freight header inputs) */
+.mini-input, .mini-select {
+  padding: 5px 7px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--bg-input);
+  color: var(--text); font-size: 0.8rem; font-family: inherit;
+  min-height: 30px;
+}
+.mini-input:focus, .mini-select:focus { outline: none; border-color: var(--border-focus); }
+
 /* ========== Info tooltip ========== */
 .info-tip { position: relative; cursor: help; color: var(--text-dim); font-size: 0.75rem; margin-left: 3px; }
 .info-tip .tip-popup {
@@ -409,7 +424,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
 }
 .info-tip:hover .tip-popup { display: block; }
 
-.edit-prod-btn { cursor: pointer; color: var(--text-dim); font-size: 0.7rem; margin-left: 2px; opacity: 0.5; }
+.edit-prod-btn { cursor: pointer; color: var(--text-dim); font-size: 0.8rem; margin-left: 2px; opacity: 0.5; padding: 4px 6px; display: inline-block; }
 .edit-prod-btn:hover { opacity: 1; color: var(--gold); }
 
 /* ========== Custom Modal ========== */
@@ -435,7 +450,6 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
 .modal-box .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .modal-box .modal-actions .btn { min-width: 70px; justify-content: center; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -536,14 +550,14 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
       <div class="card-header">
         <h2 style="display:flex;align-items:center;gap:6px;">📈 价格趋势</h2>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <select id="trendCatSelect" onchange="onTrendCatChange()" style="padding:5px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:0.8rem;font-family:inherit;max-width:180px;">
+          <select id="trendCatSelect" onchange="onTrendCatChange()" class="mini-select" style="max-width:180px;">
             <option value="">-- 选择分类 --</option>
             <option value="prod-potion">产物 · 药品恢复类</option>
             <option value="prod-cultivate">产物 · 养成材料类</option>
             <option value="mat-potion">玩家材料 · 药品恢复类</option>
             <option value="mat-cultivate">玩家材料 · 养成材料类</option><option value="treasure">💎 宝图残片</option>
           </select>
-          <select id="trendItemSelect" onchange="renderTrendChart()" style="padding:5px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:0.8rem;font-family:inherit;max-width:220px;">
+          <select id="trendItemSelect" onchange="renderTrendChart()" class="mini-select" style="max-width:220px;">
             <option value="">-- 选择物品 --</option>
           </select>
           <button class="btn btn-xs btn-danger" onclick="clearTrendHistory()" title="清除当前物品的历史数据" style="margin-left:4px;">🗑 清除</button>
@@ -586,12 +600,12 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
         <h2 style="display:flex;align-items:center;gap:6px;">🚚 高级帮会货运</h2>
         <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <label style="font-size:0.75rem;color:var(--text-dim);">宝图残片售价:</label>
-          <span class="info-tip" id="treasureTip" style="font-size:0.7rem;margin-right:4px;">ℹ<span class="tip-popup" id="treasureModInfo"></span></span><input type="number" id="treasurePrice" value="0" min="1" step="1" style="width:80px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="saveTreasurePrice()"> G
-          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:6px;">悲观:</label> <input type="number" id="pessimisticRate" value="90" min="50" max="100" step="1" style="width:50px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="savePessimisticRate()">%
-          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">乾坤寻宝图:</label> <input type="number" id="kunPrice" value="0" min="1" step="1" style="width:80px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="saveKunPrice()"> G
-          <label style="font-size:0.7rem;color:var(--text-dim);">比例:</label> <input type="number" id="kunRate" value="97.5" min="50" max="100" step="0.1" style="width:55px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);border-radius:3px;font-size:0.8rem;" onchange="saveKunRate()">%
-          G
+          <span class="info-tip" id="treasureTip" style="font-size:0.7rem;margin-right:4px;">ℹ<span class="tip-popup" id="treasureModInfo"></span></span><input type="number" id="treasurePrice" value="0" min="1" step="1" class="mini-input" style="width:80px;" onchange="saveTreasurePrice()"> G
+          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:6px;">悲观:</label> <input type="number" id="pessimisticRate" value="90" min="50" max="100" step="1" class="mini-input" style="width:55px;" onchange="savePessimisticRate()">%
+          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">乾坤寻宝图:</label> <input type="number" id="kunPrice" value="0" min="1" step="1" class="mini-input" style="width:80px;" onchange="saveKunPrice()"> G
+          <label style="font-size:0.7rem;color:var(--text-dim);">比例:</label> <input type="number" id="kunRate" value="97.5" min="50" max="100" step="0.1" class="mini-input" style="width:60px;" onchange="saveKunRate()">%
           <button class="btn btn-primary btn-sm" onclick="calcFreight()">📊 计算最优</button>
+          <button class="btn btn-sm btn-danger" onclick="clearAllFreightSlots()" title="清空全部 8 个货运槽位（保留预设方案库）">🗑 一键清空</button>
         </span>
       </div>
       <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:6px;">点击空槽位从下方选择方案 &nbsp;|&nbsp; 额外奖励：5个→18残片 | 6→22 | 7→28 | 8→35</div>
@@ -631,10 +645,10 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
 <div class="footer">
   税后收入 = ⌊售价 × 0.95⌋（向下取整） &nbsp;|&nbsp;
   期望利润 = (1 + 双倍概率) × 税后收入 − 原料成本 &nbsp;|&nbsp;
-  数据自动保存在浏览器本地
+  数据自动保存在浏览器本地 &nbsp;|&nbsp;
+  云端同步开启时会记录公网 IP 与浏览器信息作为访问日志
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 // ==================== DATA STORE ====================
 const STORAGE_KEY = 'mmo_craft_cloud_v1';
@@ -666,14 +680,32 @@ function updateLastUpdate() {
 let sbClient = null;
 let cloudEnabled = false;
 
-function initCloud() {
+// Lazy-load Supabase SDK on first cloud attempt (keeps initial page parse fast)
+let sbLoadPromise = null;
+function loadSupabaseJs() {
+  if (window.supabase && window.supabase.createClient) return Promise.resolve(window.supabase);
+  if (sbLoadPromise) return sbLoadPromise;
+  sbLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    s.onload = () => (window.supabase && window.supabase.createClient) ? resolve(window.supabase) : reject(new Error('Supabase SDK 加载异常'));
+    s.onerror = () => { sbLoadPromise = null; reject(new Error('Supabase SDK 网络加载失败')); };
+    document.head.appendChild(s);
+  });
+  return sbLoadPromise;
+}
+
+async function initCloud() {
   try {
-    const sb = window.supabase;
-    if (sb && sb.createClient) {
-      sbClient = sb.createClient(SUPABASE_URL, SUPABASE_KEY);
-      cloudEnabled = true;
-    }
-  } catch(e) { cloudEnabled = false; }
+    const sb = await loadSupabaseJs();
+    sbClient = sb.createClient(SUPABASE_URL, SUPABASE_KEY);
+    cloudEnabled = true;
+    return true;
+  } catch(e) {
+    console.warn('[cloud] 云端功能不可用：', e);
+    cloudEnabled = false;
+    return false;
+  }
 }
 
 async function cloudLoad() {
@@ -685,20 +717,69 @@ async function cloudLoad() {
   return null;
 }
 
+// Sanitize remote/cloud payloads through the same validator as file import
+function applyCloudData(d) {
+  try {
+    const cleaned = normalizeImportedData(d);
+    // 恢复本地 doubleChance（不从云端覆盖）
+    try {
+      var dc = JSON.parse(localStorage.getItem('mmo_doubleChance') || '{}');
+      cleaned.products.forEach(function(p) { if (dc[p.id] !== undefined) p.doubleChance = dc[p.id]; });
+    } catch(e) {}
+    // 云端数据与本地缓存一致时跳过重渲染，避免刷新时列表先按本地旧顺序
+    // 绘制、再被云端数据重新绘制造成的闪动
+    const changed = JSON.stringify(data) !== JSON.stringify(cleaned);
+    data = cleaned;
+    if (changed) {
+      // 回写本地缓存：下次刷新首屏就是云端最新顺序
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+      loadFreightData();
+      renderAll();
+    }
+    return true;
+  } catch(e) {
+    console.warn('[cloud] 云端数据格式异常：', e);
+    return false;
+  }
+}
+
 async function cloudSave(d) {
   if (!cloudEnabled || !sbClient) return;
   try {
     var uploadData = JSON.parse(JSON.stringify(d));
     uploadData.products.forEach(function(p) { delete p.doubleChance; });
     await sbClient.from('game_data').upsert({ id: 'v2', data: uploadData, updated_at: new Date().toISOString() });
-  } catch(e) {}
+  } catch(e) { console.warn('[cloud] 保存失败：', e); }
 }
+
+// Debounced cloud save: merge bursts of edits into one upsert, preserving order.
+let cloudSaveTimer = null;
+let cloudSavePending = null;
+function cloudSaveDebounced(d) {
+  cloudSavePending = d;
+  if (cloudSaveTimer) return;
+  cloudSaveTimer = setTimeout(function() {
+    cloudSaveTimer = null;
+    const payload = cloudSavePending;
+    cloudSavePending = null;
+    if (payload) cloudSave(payload);
+  }, 400);
+}
+function flushCloudSave() {
+  if (cloudSaveTimer) { clearTimeout(cloudSaveTimer); cloudSaveTimer = null; }
+  if (cloudSavePending) {
+    const payload = cloudSavePending;
+    cloudSavePending = null;
+    cloudSave(payload);
+  }
+}
+window.addEventListener('pagehide', flushCloudSave);
 
 function cloudListen() {
   if (!cloudEnabled || !sbClient) return;
   sbClient.channel('data_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'game_data' }, () => {
-      cloudLoad().then(d => { if (d) { data = d; try { var dc2 = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); data.products.forEach(function(p) { if (dc2[p.id] !== undefined) p.doubleChance = dc2[p.id]; }); } catch(e) {} loadFreightData(); renderAll(); toast('📡 数据已从云端更新', 'success'); } });
+      cloudLoad().then(d => { if (d && applyCloudData(d)) toast('📡 数据已从云端更新', 'success'); });
     }).subscribe();
 }
 const SORT_FIELDS = ['name','sellPrice','afterTax','cost','profit','profitRate','expectedProfit','expectedProfitRate','staminaProfit','staminaExpectedProfit','staminaExpectedLow'];
@@ -724,23 +805,30 @@ function loadData() {
     if (raw) {
       const d = JSON.parse(raw);
       // Migrate old format if needed: playerMaterials without category
+      if (!Array.isArray(d.systemMaterials)) d.systemMaterials = [];
+      if (!Array.isArray(d.playerMaterials)) d.playerMaterials = [];
+      if (!Array.isArray(d.products)) d.products = [];
       if (d.playerMaterials) {
         d.playerMaterials.forEach(m => { if (!m.category) m.category = 'potion'; });
       }
       if (d.products) {
-        d.products.forEach(p => { if (!p.category) p.category = 'potion'; if (!p.baseOutput) p.baseOutput = 1; });
+        d.products.forEach(p => {
+          if (!p.category) p.category = 'potion';
+          if (!p.baseOutput) p.baseOutput = 1;
+          if (!Array.isArray(p.ingredients)) p.ingredients = [];
+        });
       }
       if (!d.priceHistory) d.priceHistory = {};
       if (!d.freightPresets) d.freightPresets = [];
       if (d.treasurePrice === undefined) d.treasurePrice = 0;
-      if (!d.lastUpdatedBy) d.lastUpdatedBy = "";
-      if (!d.lastUpdatedAt) d.lastUpdatedAt = "";
+      // 悲观比例为个人设置，清除历史版本误同步到数据里的残留
+      if (d.pessimisticRate !== undefined) delete d.pessimisticRate;
       if (!d.lastUpdatedBy) d.lastUpdatedBy = "";
       if (!d.lastUpdatedAt) d.lastUpdatedAt = "";
       return d;
     }
   } catch(e) {}
-  return { systemMaterials: [], playerMaterials: [], products: [], priceHistory: {} };
+  return { systemMaterials: [], playerMaterials: [], products: [], priceHistory: {}, freightPresets: [], treasurePrice: 0, lastUpdatedBy: '', lastUpdatedAt: '' };
 }
 
 function saveData() {
@@ -749,15 +837,26 @@ function saveData() {
   data.products.forEach(function(p) { if (p.doubleChance !== undefined) dc[p.id] = p.doubleChance; });
   localStorage.setItem('mmo_doubleChance', JSON.stringify(dc));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  cloudSave(data);
+  cloudSaveDebounced(data);
 }
 
 let data = loadData();
 let activeProductForm = null; // 'potion' | 'cultivate' | null
 let tempIngredients = [];
-let sortState = { potion: { field: 'profit', asc: false }, cultivate: { field: 'profit', asc: false } };
+let sortState = (function() {
+  try {
+    const s = JSON.parse(localStorage.getItem('mmo_craft_sort') || 'null');
+    if (s && s.potion && s.cultivate) {
+      return {
+        potion: { field: SORT_FIELDS.includes(s.potion.field) ? s.potion.field : 'profit', asc: s.potion.asc === true },
+        cultivate: { field: SORT_FIELDS.includes(s.cultivate.field) ? s.cultivate.field : 'profit', asc: s.cultivate.asc === true }
+      };
+    }
+  } catch(e) {}
+  return { potion: { field: 'profit', asc: false }, cultivate: { field: 'profit', asc: false } };
+})();
 let trendChart = null;
-let leftPanelVisible = true;
+let leftPanelVisible = localStorage.getItem('mmo_craft_left_panel') !== 'false';
 
 // ==================== UTILS ====================
 function genId() { return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
@@ -842,8 +941,8 @@ function renderSystemMaterials() {
       <span class="name">${esc(m.name)}</span>
       <span class="price">${fmtGold(m.price)}<span class="unit">G</span></span>
       <div class="actions">
-        <button class="btn btn-xs" onclick="editMaterialPrice('system','${m.id}')" title="修改价格">✎</button>
-        <button class="btn btn-xs btn-danger" onclick="deleteMaterial('system','${m.id}')" title="删除">✕</button>
+        <button class="btn btn-icon" onclick="editMaterialPrice('system','${m.id}')" title="修改价格" aria-label="修改价格">✎</button>
+        <button class="btn btn-del btn-danger" onclick="deleteMaterial('system','${m.id}')" title="删除" aria-label="删除">✕</button>
       </div>
     </div>
   `).join('');
@@ -867,7 +966,7 @@ function renderPlayerMaterials(cat) {
       <input type="number" class="inline-price-input" value="${m.price}"
         onchange="updatePlayerPrice('${m.id}',this.value)" onfocus="this.select()" min="1">
       <div class="actions">
-        <button class="btn btn-xs btn-danger" onclick="deleteMaterial('player','${m.id}')" title="删除">✕</button>
+        <button class="btn btn-del btn-danger" onclick="deleteMaterial('player','${m.id}')" title="删除" aria-label="删除">✕</button>
       </div>
     </div>
   `).join('');
@@ -899,8 +998,8 @@ function renderTableHead(cat) {
   th.innerHTML = '<tr>' + SORT_FIELDS.map(f => {
     const sc = curSort.field === f ? ' sorted' : '';
     const tip = titles[f] ? ` title="${titles[f]}"` : '';
-    return `<th class="${sc}" data-sort="${f}" onclick="sortProducts('${cat}','${f}')"${tip}>${labels[f]} <span class="sort-arrow">⇅</span></th>`;
-  }).join('') + '<th>操作</th></tr>';
+    return `<th class="${sc}" data-col="${f}" data-sort="${f}" tabindex="0" role="button" onclick="sortProducts('${cat}','${f}')" onkeydown="sortKey(event,'${cat}','${f}')"${tip}>${labels[f]} <span class="sort-arrow">⇅</span></th>`;
+  }).join('') + '<th data-col="actions">操作</th></tr>';
 }
 
 // ---- Product Table Body ----
@@ -971,36 +1070,27 @@ function renderProductTable(cat) {
       else if (agoH >= 12) nameColor = 'color:var(--orange);';
     }
     return `<tr>
-      <td><strong style="${nameColor}">${esc(p.name)}</strong><span class="info-tip"> ℹ<span class="tip-popup"><b>体力：</b>${p.staminaCost} 体 &nbsp;|&nbsp; <b>产出：</b>${p.baseOutput||1} 个<br><b>原料：</b>${esc(ingStr)}${modInfo}</span></span><span class="edit-prod-btn" onclick="editProduct('${p.id}')" title="编辑产物"> ✎</span></td>
-      <td>${fmtGold(p.sellPrice)} G</td>
-      <td class="income-cell">${fmtGold(p.totalIncome)} G</td>
-      <td class="cost-cell">${fmtGold(p.cost)} G</td>
-      <td class="${pc}">${p.profit>=0?'+':''}${fmtGold(p.profit)} G</td>
-      <td class="${pc}">${prStr}</td>
-      <td class="${epc}">${p.expectedProfit>=0?'+':''}${fmtGold(p.expectedProfit)} G</td>
-      <td class="${epc}">${eprStr}</td>
-      <td class="${p.staminaProfit < 0 ? 'profit-negative' : 'stamina-cell'}">${fmtDec(p.staminaProfit,1)} G/体</td>
-      <td class="${p.staminaExpectedProfit < 0 ? 'profit-negative' : 'stamina-cell'}">${fmtDec(p.staminaExpectedProfit,1)} G/体</td>
-      <td class="stamina-cell" style="color:var(--gold);">${fmtDec(p.staminaExpectedLow,1)} G/体</td>
-      <td>
-        <button class="btn btn-xs" style="padding:1px 4px;font-size:0.6rem;" onclick="editProductSellPrice('${p.id}')" title="快速改售价">💰</button>
-        <button class="btn btn-xs" style="padding:1px 4px;font-size:0.6rem;" onclick="editProductDoubleChance('${p.id}')" title="修改双倍概率">🎯</button>
-        <button class="btn btn-xs btn-danger" style="padding:1px 4px;font-size:0.6rem;" onclick="deleteProduct('${p.id}')" title="删除">✕</button>
+      <td data-col="name"><strong style="${nameColor}">${esc(p.name)}</strong><span class="info-tip"> ℹ<span class="tip-popup"><b>体力：</b>${p.staminaCost} 体 &nbsp;|&nbsp; <b>产出：</b>${p.baseOutput||1} 个<br><b>原料：</b>${esc(ingStr)}${modInfo}</span></span><span class="edit-prod-btn" onclick="editProduct('${p.id}')" title="编辑产物" aria-label="编辑产物"> ✎</span></td>
+      <td data-col="sellPrice">${fmtGold(p.sellPrice)} G</td>
+      <td data-col="afterTax" class="income-cell">${fmtGold(p.totalIncome)} G</td>
+      <td data-col="cost" class="cost-cell">${fmtGold(p.cost)} G</td>
+      <td data-col="profit" class="${pc}">${p.profit>=0?'+':''}${fmtGold(p.profit)} G</td>
+      <td data-col="profitRate" class="${pc}">${prStr}</td>
+      <td data-col="expectedProfit" class="${epc}">${p.expectedProfit>=0?'+':''}${fmtGold(p.expectedProfit)} G</td>
+      <td data-col="expectedProfitRate" class="${epc}">${eprStr}</td>
+      <td data-col="staminaProfit" class="${p.staminaProfit < 0 ? 'profit-negative' : 'stamina-cell'}">${fmtDec(p.staminaProfit,1)} G/体</td>
+      <td data-col="staminaExpectedProfit" class="${p.staminaExpectedProfit < 0 ? 'profit-negative' : 'stamina-cell'}">${fmtDec(p.staminaExpectedProfit,1)} G/体</td>
+      <td data-col="staminaExpectedLow" class="stamina-cell" style="color:var(--gold);">${fmtDec(p.staminaExpectedLow,1)} G/体</td>
+      <td data-col="actions">
+        <button class="btn btn-icon" onclick="editProductSellPrice('${p.id}')" title="快速改售价" aria-label="快速改售价">💰</button>
+        <button class="btn btn-icon" onclick="editProductDoubleChance('${p.id}')" title="修改双倍概率" aria-label="修改双倍概率">🎯</button>
+        <button class="btn btn-del btn-danger" onclick="deleteProduct('${p.id}')" title="删除" aria-label="删除">✕</button>
       </td>
     </tr>`;
   }).join('');
 }
 
 // ---- Product Form ----
-function allMaterialsForSelect(cat) {
-  const sys = data.systemMaterials.map(m => ({ ...m, type: 'system', typeLabel: '系统' }));
-  // Filter player materials: only show the same category as the product
-  const player = data.playerMaterials
-    .filter(m => !cat || m.category === cat)
-    .map(m => ({ ...m, type: 'player', typeLabel: m.category === 'potion' ? '玩家·药品' : '玩家·养成' }));
-  return [...sys, ...player];
-}
-
 function systemMaterialsForSelect() {
   return data.systemMaterials.map(m => ({ ...m, type: 'system', typeLabel: '系统' }));
 }
@@ -1019,7 +1109,6 @@ function renderProductForm(cat) {
   if (activeProductForm !== cat) { formPanel.style.display = 'none'; return; }
   formPanel.style.display = 'block';
 
-  const allMats = allMaterialsForSelect(cat);
   formPanel.innerHTML = `
     <div class="product-form">
       <div><label>产物名称</label><input type="text" id="prodName_${cat}" placeholder="例如：高级法力药水"></div>
@@ -1058,7 +1147,7 @@ function renderIngredientRows(cat) {
       </select>
       <input type="number" value="${ing.quantity}" min="1" placeholder="数量"
         onchange="tempIngredients[${idx}].quantity=parseInt(this.value)||1">
-      <button class="btn btn-xs btn-danger" onclick="tempIngredients.splice(${idx},1);renderIngredientRows('${cat}');">✕</button>
+      <button class="btn btn-del btn-danger" aria-label="移除原料" onclick="tempIngredients.splice(${idx},1);renderIngredientRows('${cat}');">✕</button>
     </div>`;
   }).join('');
 }
@@ -1104,8 +1193,8 @@ function addPlayerMaterial(cat) {
   const newId = data.playerMaterials[data.playerMaterials.length-1].id;
   document.getElementById(nameId).value = '';
   document.getElementById(priceId).value = '';
-  saveData();
   recordPrice('mat', newId, price);
+  saveData();
   renderAll();
   const catLabel = cat === 'potion' ? '药品恢复类' : '养成材料类';
   toast(`已添加玩家材料（${catLabel}）：${name}`);
@@ -1119,8 +1208,8 @@ function editMaterialPrice(type, matId) {
     const price = parseInt(val);
     if (isNaN(price) || price <= 0) { toast('请输入有效价格','error'); return false; }
     mat.price = price;
-    saveData();
     if (type === 'player') recordPrice('mat', matId, price);
+    saveData();
     renderAll(); toast(`${mat.name} 价格已更新`);
     return true;
   });
@@ -1132,8 +1221,8 @@ function updatePlayerPrice(matId, val) {
   const mat = data.playerMaterials.find(m => m.id === matId);
   if (!mat) return;
   mat.price = price;
-  saveData();
   recordPrice('mat', matId, price);
+  saveData();
   // Only update product tables (avoid re-rendering material lists so input focus stays)
   renderProductTable('potion');
   renderProductTable('cultivate');
@@ -1207,8 +1296,8 @@ function saveProduct(cat) {
     ingredients: ings.map(i => ({ materialId: i.materialId, materialType: i.materialType, quantity: i.quantity }))
   });
   const newId = data.products[data.products.length-1].id;
-  saveData();
   recordPrice('prod', newId, sellPrice);
+  saveData();
   closeProductForm(); renderAll();
   const catLabel = cat === 'potion' ? '药品恢复类' : '养成材料类';
   toast(`已添加产物（${catLabel}）：${name}`);
@@ -1221,8 +1310,8 @@ function editProductSellPrice(prodId) {
     const price = parseInt(val);
     if (isNaN(price) || price <= 0) { toast('请输入有效售价','error'); return false; }
     prod.sellPrice = price;
-    saveData();
     recordPrice('prod', prodId, price);
+    saveData();
     renderAll(); toast(`${prod.name} 售价 → ${fmtGold(price)} G`);
     return true;
   });
@@ -1262,7 +1351,7 @@ function editProduct(prodId) {
       const matName = mat ? mat.name : '(已删除)';
       return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.78rem;">
         <span style="flex:1;">${esc(matName)} ×${ing.quantity}</span>
-        <button class="btn btn-xs btn-danger" style="padding:0 4px;font-size:0.6rem;" onclick="editIngs_remove(${idx})">✕</button>
+        <button class="btn btn-del btn-danger" aria-label="移除原料" onclick="editIngs_remove(${idx})">✕</button>
       </div>`;
     }).join('') + `<div style="display:flex;gap:4px;margin-top:4px;" id="epAddIngRow">
       <select id="epIngSel" style="flex:2;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:0.75rem;border-radius:3px;">
@@ -1270,7 +1359,7 @@ function editProduct(prodId) {
         ${mats.map(m => `<option value="${m.id}" data-type="${m.type}">[${m.typeLabel}] ${esc(m.name)} (${fmtGold(m.price)}G)</option>`).join('')}
       </select>
       <input type="number" id="epIngQty" value="1" min="1" style="width:50px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:0.75rem;border-radius:3px;">
-      <button class="btn btn-xs btn-primary" style="padding:1px 6px;font-size:0.65rem;" onclick="editIngs_add()">添加</button>
+      <button class="btn btn-xs btn-primary" style="padding:3px 8px;" onclick="editIngs_add()">添加</button>
     </div>`;
   }
   
@@ -1317,15 +1406,12 @@ function editProduct(prodId) {
     prod.name = name; prod.sellPrice = price; prod.staminaCost = stamina;
     prod.baseOutput = output; prod.doubleChance = dbl;
     prod.ingredients = editIngs;
-    saveData();
     recordPrice('prod', prodId, price);
+    saveData();
     closeModal(); renderAll(); toast(`${name} 已更新`);
-    window.editIngs_remove = null; window.editIngs_add = null;
   };
-  m.addEventListener('click', (e) => { if (e.target === m) { closeModal(); window.editIngs_remove = null; window.editIngs_add = null; } });
-  document.addEventListener('keydown', function escClose(e) {
-    if (e.key === 'Escape') { closeModal(); window.editIngs_remove = null; window.editIngs_add = null; document.removeEventListener('keydown', escClose); }
-  });
+  m.addEventListener('click', (e) => { if (e.target === m) closeModal(); });
+  bindEscClose();
 }
 
 // ---- Modal helpers ----
@@ -1348,14 +1434,22 @@ function showPrompt(title, defaultValue, onConfirm) {
   };
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('pmOkBtn').click(); });
   m.addEventListener('click', (e) => { if (e.target === m) closeModal(); });
-  document.addEventListener('keydown', function escClose(e) {
-    if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escClose); }
-  });
+  bindEscClose();
 }
 
+let modalEscHandlers = [];
+function bindEscClose() {
+  const h = function(e) { if (e.key === 'Escape') closeModal(); };
+  modalEscHandlers.push(h);
+  document.addEventListener('keydown', h);
+}
 function closeModal() {
-  const m = document.querySelector('.modal-mask');
-  if (m) m.remove();
+  modalEscHandlers.forEach(function(h) { document.removeEventListener('keydown', h); });
+  modalEscHandlers = [];
+  document.querySelectorAll('.modal-mask').forEach(function(m) { m.remove(); });
+  // Clean up per-modal globals installed by editProduct
+  window.editIngs_remove = null;
+  window.editIngs_add = null;
 }
 
 function deleteProduct(prodId) {
@@ -1371,7 +1465,14 @@ function sortProducts(cat, field) {
   const st = sortState[cat];
   if (st.field === field) { st.asc = !st.asc; }
   else { st.field = field; st.asc = (field === 'name'); }
+  localStorage.setItem('mmo_craft_sort', JSON.stringify(sortState));
   renderProductTable(cat);
+}
+
+function sortKey(e, cat, field) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  sortProducts(cat, field);
 }
 
 // ---- Import / Export ----
@@ -1390,62 +1491,120 @@ function importData(event) {
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
-      const imp = JSON.parse(e.target.result);
-      if (!imp.systemMaterials || !imp.playerMaterials || !imp.products) throw new Error('格式不正确');
-      // Migrate old data
-      imp.playerMaterials.forEach(m => { if (!m.category) m.category = 'potion'; });
-      imp.products.forEach(p => { if (!p.category) p.category = 'potion'; });
-      if (!imp.freightPresets) imp.freightPresets = [];
-      if (imp.treasurePrice === undefined) imp.treasurePrice = 0;
-      if (!imp.priceHistory) imp.priceHistory = {};
+      const imp = normalizeImportedData(JSON.parse(e.target.result));
       if (!confirm(`即将导入 ${imp.systemMaterials.length} 系统材料、${imp.playerMaterials.length} 玩家材料、${imp.products.length} 产物、${imp.freightPresets.length} 货运方案。当前数据将被覆盖！`)) return;
       data = imp;
       saveData(); loadFreightData(); renderAll(); toast('数据导入成功');
-    } catch(err) { toast('导入失败：数据格式不正确','error'); }
+    } catch(err) { console.warn('[import] 导入失败：', err); toast('导入失败：数据格式不正确','error'); }
   };
   reader.readAsText(file);
   event.target.value = '';
 }
 
-function resetAll() {
-  if (!confirm('确定清空所有数据吗？建议先导出备份。')) return;
-  data = { systemMaterials: [], playerMaterials: [], products: [] };
-  saveData(); renderAll(); toast('所有数据已清空');
+// ==================== IMPORT VALIDATION ====================
+// Strictly sanitize imported JSON: every id used in inline handlers must match
+// a whitelist pattern (prevents XSS), numeric fields are coerced, broken rows are dropped.
+const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+function safeId(id) { return (typeof id === 'string' && SAFE_ID_RE.test(id)) ? id : genId(); }
+function numOr(v, dflt) { const n = Number(v); return Number.isFinite(n) ? n : dflt; }
+function dedupeById(arr) {
+  const seen = new Set();
+  return arr.filter(x => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
 }
 
-// ---- Demo ----
-function loadDemoData() {
-  if (data.systemMaterials.length > 0 || data.playerMaterials.length > 0 || data.products.length > 0) {
-    if (!confirm('当前已有数据，加载示例将覆盖。继续？')) return;
-  }
-  data = {
-    systemMaterials: [
-      { id:'s1', name:'魔法水晶', price:200 },
-      { id:'s2', name:'精炼石', price:500 },
-      { id:'s3', name:'元素粉末', price:80 }
-    ],
-    playerMaterials: [
-      { id:'pp1', name:'月光草', price:150, category:'potion' },
-      { id:'pp2', name:'星辰花', price:320, category:'potion' },
-      { id:'pc1', name:'龙鳞碎片', price:420, category:'cultivate' },
-      { id:'pc2', name:'星辰丝线', price:280, category:'cultivate' },
-      { id:'pc3', name:'地脉结晶', price:550, category:'cultivate' }
-    ],
-    products: [
-      { id:'dp1', name:'高级法力药水', sellPrice:1200, staminaCost:8, doubleChance:12, category:'potion',
-        ingredients:[{materialId:'s1',materialType:'system',quantity:2},{materialId:'pp1',materialType:'player',quantity:3}] },
-      { id:'dp2', name:'强效治疗药剂', sellPrice:900, staminaCost:5, doubleChance:15, category:'potion',
-        ingredients:[{materialId:'s3',materialType:'system',quantity:3},{materialId:'pp2',materialType:'player',quantity:2},{materialId:'pp1',materialType:'player',quantity:1}] },
-      { id:'dc1', name:'龙鳞护甲', sellPrice:2500, staminaCost:15, doubleChance:5, category:'cultivate',
-        ingredients:[{materialId:'s2',materialType:'system',quantity:1},{materialId:'pc1',materialType:'player',quantity:2},{materialId:'pc2',materialType:'player',quantity:1}] },
-      { id:'dc2', name:'附魔手套', sellPrice:1800, staminaCost:10, doubleChance:8, category:'cultivate',
-        ingredients:[{materialId:'s2',materialType:'system',quantity:1},{materialId:'pc2',materialType:'player',quantity:2},{materialId:'pc3',materialType:'player',quantity:1}] }
-    ],
-    priceHistory: {}
+function normalizeImportedData(imp) {
+  if (!imp || typeof imp !== 'object') throw new Error('格式不正确');
+  if (!Array.isArray(imp.systemMaterials) || !Array.isArray(imp.playerMaterials) || !Array.isArray(imp.products)) throw new Error('格式不正确');
+
+  const clean = {
+    systemMaterials: dedupeById(imp.systemMaterials.map(m => {
+      const name = String((m && m.name) || '').trim().slice(0, 100);
+      if (!name) return null;
+      return { id: safeId(m.id), name, price: Math.max(1, Math.round(numOr(m.price, 0))) };
+    }).filter(Boolean)),
+
+    playerMaterials: dedupeById(imp.playerMaterials.map(m => {
+      const name = String((m && m.name) || '').trim().slice(0, 100);
+      if (!name) return null;
+      return { id: safeId(m.id), name, price: Math.max(1, Math.round(numOr(m.price, 0))), category: m.category === 'cultivate' ? 'cultivate' : 'potion' };
+    }).filter(Boolean)),
+
+    products: dedupeById(imp.products.map(p => {
+      const name = String((p && p.name) || '').trim().slice(0, 100);
+      if (!name) return null;
+      const ingredients = Array.isArray(p.ingredients)
+        ? p.ingredients.map(i => ({
+            materialId: safeId(i && i.materialId),
+            materialType: (i && i.materialType) === 'player' ? 'player' : 'system',
+            quantity: Math.max(1, Math.round(numOr(i && i.quantity, 1)))
+          })).filter(i => i.materialId)
+        : [];
+      if (!ingredients.length) return null;
+      return {
+        id: safeId(p.id), name,
+        sellPrice: Math.max(1, Math.round(numOr(p.sellPrice, 0))),
+        staminaCost: Math.max(1, Math.round(numOr(p.staminaCost, 1))),
+        baseOutput: Math.max(1, Math.round(numOr(p.baseOutput, 1))),
+        doubleChance: Math.min(100, Math.max(0, numOr(p.doubleChance, 0))),
+        category: p.category === 'cultivate' ? 'cultivate' : 'potion',
+        ingredients
+      };
+    }).filter(Boolean))
   };
-  saveData();
-  sortState = { potion:{field:'profit',asc:false}, cultivate:{field:'profit',asc:false} };
-  renderAll(); toast('示例数据已加载，试试点击表头排序吧！');
+
+  clean.freightPresets = Array.isArray(imp.freightPresets)
+    ? dedupeById(imp.freightPresets.map(pr => {
+        if (!pr || !pr.productId) return null;
+        const name = String(pr.name || '').trim().slice(0, 100);
+        if (!name) return null;
+        return {
+          id: safeId(pr.id), name, productId: safeId(pr.productId),
+          qty: Math.max(1, Math.round(numOr(pr.qty, 1))),
+          rewardQty: Math.max(1, Math.round(numOr(pr.rewardQty, 3)))
+        };
+      }).filter(Boolean))
+    : [];
+
+  clean.treasurePrice = Math.max(0, Math.round(numOr(imp.treasurePrice, 0)));
+  // 乾坤藏宝图价格/比例参与云同步；源数据无该字段时保持缺省，
+  // 让 loadFreightData 回退到本地设置（兼容旧云端数据）。
+  if (imp.kunPrice !== undefined) clean.kunPrice = Math.max(0, Math.round(numOr(imp.kunPrice, 0)));
+  if (imp.kunRate !== undefined) clean.kunRate = Math.min(100, Math.max(50, numOr(imp.kunRate, 97.5)));
+  // 悲观比例为个人设置：无论源数据是否携带，都不写入数据对象
+
+  clean.priceHistory = {};
+  if (imp.priceHistory && typeof imp.priceHistory === 'object' && !Array.isArray(imp.priceHistory)) {
+    Object.keys(imp.priceHistory).forEach(key => {
+      if (!/^[A-Za-z0-9_]{1,80}$/.test(key)) return;
+      const arr = imp.priceHistory[key];
+      if (!Array.isArray(arr)) return;
+      const list = arr.map(h => {
+        const price = Math.round(numOr(h && h.price, NaN));
+        if (!Number.isFinite(price)) return null;
+        const date = (h && typeof h.date === 'string' && !isNaN(new Date(h.date))) ? h.date : new Date().toISOString();
+        return { date, price };
+      }).filter(Boolean).slice(-200);
+      if (list.length) clean.priceHistory[key] = list;
+    });
+  }
+
+  clean.lastUpdatedBy = typeof imp.lastUpdatedBy === 'string' ? imp.lastUpdatedBy.slice(0, 50) : '';
+  clean.lastUpdatedAt = typeof imp.lastUpdatedAt === 'string' ? imp.lastUpdatedAt.slice(0, 40) : '';
+  return clean;
+}
+
+function resetAll() {
+  if (!confirm('确定清空所有数据吗？建议先导出备份。')) return;
+  data = {
+    systemMaterials: [], playerMaterials: [], products: [],
+    priceHistory: {}, freightPresets: [], treasurePrice: 0,
+    kunPrice: 0, kunRate: 97.5,
+    lastUpdatedBy: '', lastUpdatedAt: ''
+  };
+  freightPresets = [];
+  freightSlots = [null,null,null,null,null,null,null,null];
+  localStorage.removeItem('freight_slots');
+  saveData(); loadFreightData(); renderAll(); toast('所有数据已清空');
 }
 
 // ==================== PRICE HISTORY ====================
@@ -1458,7 +1617,6 @@ function recordPrice(type, id, price) {
   if (last && last.price === price) return;
   data.priceHistory[key].push({ date: new Date().toISOString(), price: price });
   if (data.priceHistory[key].length > 200) data.priceHistory[key] = data.priceHistory[key].slice(-200);
-  saveData();
 }
 
 // ==================== TREND CHART ====================
@@ -1514,7 +1672,24 @@ function onTrendCatChange() {
   renderTrendChart();
 }
 
-function populateTrendSelect() {}
+// Lazy-load Chart.js only when a trend item is actually selected
+const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+const CHART_JS_INTEGRITY = 'sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC';
+let chartJsPromise = null;
+function ensureChartJs() {
+  if (window.Chart) return Promise.resolve();
+  if (chartJsPromise) return chartJsPromise;
+  chartJsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = CHART_JS_URL;
+    s.integrity = CHART_JS_INTEGRITY;
+    s.crossOrigin = 'anonymous';
+    s.onload = () => window.Chart ? resolve() : reject(new Error('Chart.js 加载异常'));
+    s.onerror = () => { chartJsPromise = null; reject(new Error('Chart.js 网络加载失败')); };
+    document.head.appendChild(s);
+  });
+  return chartJsPromise;
+}
 
 function clearTrendHistory() {
   const key = document.getElementById('trendItemSelect').value;
@@ -1529,7 +1704,6 @@ function clearTrendHistory() {
 }
 
 function renderTrendChart() {
-  if (typeof Chart === 'undefined') { toast('图表库加载失败，请检查网络连接', 'error'); return; }
   const select = document.getElementById('trendItemSelect');
   const key = select.value;
   const empty = document.getElementById('trendEmpty');
@@ -1552,6 +1726,17 @@ function renderTrendChart() {
     return;
   }
 
+  if (typeof Chart === 'undefined') {
+    canvas.style.display = 'none';
+    empty.style.display = 'block';
+    empty.querySelector('p').textContent = '图表加载中…';
+    ensureChartJs().then(() => renderTrendChart()).catch(() => {
+      empty.querySelector('p').textContent = '图表库加载失败，请检查网络连接';
+      toast('图表库加载失败，请检查网络连接', 'error');
+    });
+    return;
+  }
+
   canvas.style.display = 'block';
   empty.style.display = 'none';
 
@@ -1559,19 +1744,21 @@ function renderTrendChart() {
   // Aggregate: today's data kept raw, older days averaged
   const today = new Date().toISOString().slice(0, 10);
   const grouped = {};
+  const todayEntries = [];
   sorted.forEach(h => {
     const d = h.date.slice(0, 10); // YYYY-MM-DD
     if (!grouped[d]) grouped[d] = [];
     grouped[d].push(h.price);
+    if (d === today) todayEntries.push(h);
   });
   const labels = [], prices = [];
   Object.keys(grouped).sort().forEach(day => {
     const vals = grouped[day];
     if (day === today) {
-      vals.forEach((v, i) => {
-        const d = new Date(sorted.find(h => h.date.slice(0,10) === day && h.price === v)?.date || day);
+      todayEntries.forEach(h => {
+        const d = new Date(h.date);
         labels.push((d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'));
-        prices.push(v);
+        prices.push(h.price);
       });
     } else {
       const avg = Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
@@ -1680,23 +1867,22 @@ function updateTreasureModInfo() {
 }
 function loadFreightData() {
   if (data.freightPresets) freightPresets = data.freightPresets;
-  treasurePrice = data.treasurePrice || 0;
+  treasurePrice = Number(data.treasurePrice) || 0;
+  // 悲观比例：个人设置，仅本地保存，不参与云同步
   pessimisticRate = parseInt(localStorage.getItem("pessimisticRate")) || 90;
   document.getElementById("pessimisticRate").value = pessimisticRate;
-  kunPrice = parseInt(localStorage.getItem("kunPrice")) || 0;
+  // 乾坤藏宝图价格/比例：参与云同步，老版本无此字段时回退到本地设置
+  const localKun = parseInt(localStorage.getItem("kunPrice")) || 0;
+  kunPrice = (data.kunPrice !== undefined) ? (Number(data.kunPrice) || 0) : localKun;
   document.getElementById("kunPrice").value = kunPrice;
-  kunRate = parseFloat(localStorage.getItem("kunRate")) || 97.5;
+  const localKunRate = parseFloat(localStorage.getItem("kunRate")) || 97.5;
+  kunRate = (data.kunRate !== undefined) ? (Number(data.kunRate) || 97.5) : localKunRate;
   document.getElementById("kunRate").value = kunRate;
   document.getElementById('treasurePrice').value = treasurePrice;
   updateTreasureModInfo();
   // Load local slots
   try { const s = localStorage.getItem('freight_slots'); if (s) freightSlots = JSON.parse(s); } catch(e) {}
   renderFreight();
-  // Re-bind draggable after render
-  setTimeout(function() {
-    var card = document.getElementById('card-freight');
-    if (card) card.querySelectorAll('.preset-item').forEach(function(el) { el.setAttribute('draggable', 'true'); });
-  }, 100);
 }
 
 function savePessimisticRate() {
@@ -1707,11 +1893,15 @@ function savePessimisticRate() {
 function saveKunPrice() {
   kunPrice = parseInt(document.getElementById("kunPrice").value) || 0;
   localStorage.setItem("kunPrice", kunPrice);
+  data.kunPrice = kunPrice;
+  saveData();
 }
 
 function saveKunRate() {
   kunRate = parseFloat(document.getElementById("kunRate").value) || 97.5;
   localStorage.setItem("kunRate", kunRate);
+  data.kunRate = kunRate;
+  saveData();
 }
 
 function saveTreasurePrice() {
@@ -1719,6 +1909,7 @@ function saveTreasurePrice() {
   data.treasurePrice = treasurePrice;
   recordPrice('treasure', 'treasure', treasurePrice);
   saveData();
+  updateTreasureModInfo();
 }
 
 function saveFreightSlots() {
@@ -1732,24 +1923,26 @@ function renderFreightGrid() {
     if (slot) {
       const p = data.products.find(x => x.id === slot.productId);
       const name = p ? p.name : '(已删除)';
-      return '<div class="freight-slot filled calculated" title="点击清除"><span class="slot-num">' + (slot.order||'') + '</span><span class="slot-name">' + esc(name) + ' ×' + slot.qty + ' → ' + (slot.rewardQty||3) + '残片</span><span class="slot-clear" onclick="clearFreightSlot(' + idx + ')">✕</span></div>';
+      return '<div class="freight-slot filled calculated" title="点击清除" onclick="clearFreightSlot(' + idx + ')"><span class="slot-num">' + (slot.order||'') + '</span><span class="slot-name">' + esc(name) + ' ×' + slot.qty + ' → ' + (slot.rewardQty||3) + '残片</span><span class="slot-clear" title="清除槽位" aria-label="清除槽位" onclick="event.stopPropagation();clearFreightSlot(' + idx + ')">✕</span></div>';
     }
-    return '<div class="freight-slot"><span style="color:var(--text-dim);font-size:0.7rem;">+ 点击/拖入方案</span></div>';
+    const picking = pickTargetSlot === idx ? ' picking' : '';
+    return '<div class="freight-slot' + picking + '" onclick="pickPresetForSlot(' + idx + ')"><span style="color:var(--text-dim);font-size:0.7rem;">' + (picking ? '👈 点击下方方案填入' : '+ 点击/拖入方案') + '</span></div>';
   }).join('');
 }
 
 function renderPresetList() {
   const ct = document.getElementById('presetList');
   if (!ct) return;
-  freightPresets.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN'));
-  if (!freightPresets.length) {
+  // 只对副本排序，避免每次渲染打乱 data.freightPresets 的原始顺序
+  const sorted = [...freightPresets].sort((a,b) => a.name.localeCompare(b.name, 'zh-CN'));
+  if (!sorted.length) {
     ct.innerHTML = '<div class="empty-state"><p>暂无预设方案，点击下方添加</p></div>';
     return;
   }
-  ct.innerHTML = freightPresets.map(pr => {
+  ct.innerHTML = sorted.map(pr => {
     const p = data.products.find(x => x.id === pr.productId);
     const pname = p ? p.name : '(已删除)';
-    return '<div class="preset-item" onclick="addToSlot(' + freightPresets.indexOf(pr) + ')"><span class="preset-name">' + esc(pr.name) + '</span><span class="preset-info">' + esc(pname) + ' ×' + pr.qty + ' → ' + (pr.rewardQty||3) + '残片</span><button class="btn btn-xs btn-danger" onclick="event.stopPropagation();deleteFreightPreset(' + freightPresets.indexOf(pr) + ')">✕</button></div>';
+    return '<div class="preset-item" draggable="true" onclick="addToSlot(' + freightPresets.indexOf(pr) + ')"><span class="preset-name">' + esc(pr.name) + '</span><span class="preset-info">' + esc(pname) + ' ×' + pr.qty + ' → ' + (pr.rewardQty||3) + '残片</span><button class="btn btn-del btn-danger" aria-label="删除方案" onclick="event.stopPropagation();deleteFreightPreset(' + freightPresets.indexOf(pr) + ')">✕</button></div>';
   }).join('');
 }
 
@@ -1793,30 +1986,48 @@ function initFreightDrag() {
       renderFreightGrid();
     }
   });
-  // Make preset items draggable
-  card.querySelectorAll('.preset-item').forEach(function(el) { el.setAttribute('draggable', 'true'); });
 }
 
 let pickTargetSlot = -1;
-function pickPresetForSlot(idx) { pickTargetSlot = idx; }
+function pickPresetForSlot(idx) {
+  if (freightSlots[idx]) { clearFreightSlot(idx); return; }
+  // Toggle: click the same empty slot again to cancel selection
+  pickTargetSlot = pickTargetSlot === idx ? -1 : idx;
+  renderFreightGrid();
+  if (pickTargetSlot >= 0) toast('已选中槽位 ' + (idx + 1) + '，请点击下方预设方案');
+}
 function addToSlot(presetIdx) {
-  if (pickTargetSlot < 0) return;
+  if (pickTargetSlot < 0) { toast('请先点击一个空槽位','error'); return; }
   const pr = freightPresets[presetIdx];
-  freightSlots[pickTargetSlot] = { productId: pr.productId, qty: pr.qty, name: pr.name, rewardQty: pr.rewardQty || 3 };
+  if (!pr) return;
+  const slotIdx = pickTargetSlot;
+  freightSlots[slotIdx] = { productId: pr.productId, qty: pr.qty, name: pr.name, rewardQty: pr.rewardQty || 3 };
   pickTargetSlot = -1;
   saveFreightSlots();
   renderFreightGrid();
+  toast(`已把「${pr.name}」填入槽位 ${slotIdx + 1}`);
 }
-
-function dropOnSlot(e,idx){e.preventDefault();e.target.style.borderColor="";var pi=parseInt(e.dataTransfer.getData("presetIdx"));if(!isNaN(pi)&&pi>=0){var pr=freightPresets[pi];freightSlots[idx]={productId:pr.productId,qty:pr.qty,name:pr.name,rewardQty:pr.rewardQty||3};saveFreightSlots();renderFreightGrid();}}
 function clearFreightSlot(idx) {
   freightSlots[idx] = null;
+  if (pickTargetSlot === idx) pickTargetSlot = -1;
   saveFreightSlots();
   renderFreightGrid();
 }
+function clearAllFreightSlots() {
+  const filled = freightSlots.filter(s => s).length;
+  if (!filled) { toast('货运槽位已经是空的','error'); return; }
+  freightSlots = [null,null,null,null,null,null,null,null];
+  pickTargetSlot = -1;
+  saveFreightSlots();
+  // 同时收起上一次的计算结果，避免显示过期的方案
+  const summary = document.getElementById('freightSummary');
+  if (summary) { summary.style.display = 'none'; summary.innerHTML = ''; }
+  renderFreightGrid();
+  toast('已一键清空 ' + filled + ' 个货运槽位');
+}
 
 function addFreightPreset() {
-  const prods = data.products.sort(function(a, b) {
+  const prods = [...data.products].sort(function(a, b) {
     var scoreA = 0, scoreB = 0;
     if (a.category === 'cultivate') scoreA = 2;
     else if (a.name.startsWith('中品')) scoreA = 1;
@@ -1850,7 +2061,7 @@ function addFreightPreset() {
     toast('方案已添加');
   };
   m.addEventListener('click', function(e) { if (e.target === m) closeModal(); });
-  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', esc); } });
+  bindEscClose();
 }
 
 function deleteFreightPreset(idx) {
@@ -1864,11 +2075,14 @@ function calcFreight() {
   if (!treasurePrice) { toast('请先设置宝图残片售价','error'); return; }
   const active = freightSlots.filter(s => s);
   if (!active.length) { toast('请先填充至少一个槽位','error'); return; }
+  if (active.length < 5) { toast('至少填充 5 个槽位才能计算（额外奖励从 5 个起）','error'); return; }
   
   const treasureIncome = taxIncome(treasurePrice); // single fragment after-tax
   // 乾坤寻宝图对应残片价（仅展示对比，不参与主要计算）
   const kunFragmentPrice = kunPrice > 0 ? Math.floor(taxIncome(kunPrice) * (kunRate / 100) / 30) : 0;
   const bonusMap = { 5: 18, 6: 22, 7: 28, 8: 35 };
+  // Pessimistic: treasure ×0.9, cost ×1.01（个人设置，读取本地变量）
+  const pessRate = (pessimisticRate || 90) / 100;
   
   // Get top 3 staminaExpectedProfit from products
   const ranked = data.products.map(p => calcProduct(p)).filter(c => c.staminaExpectedProfit > 0).sort((a,b) => b.staminaExpectedProfit - a.staminaExpectedProfit);
@@ -1889,8 +2103,6 @@ function calcFreight() {
     const craftProfit = income - craftCost - oppCost;
     const better = directProfit >= craftProfit ? 'buy' : 'craft';
     const betterProfit = Math.max(directProfit, craftProfit);
-    // Pessimistic: treasure 90%, cost ×1.01
-    const pessRate = (parseInt(localStorage.getItem("pessimisticRate")) || 90) / 100;
     const pessIncome = Math.floor(treasureIncome * pessRate) * (slot.rewardQty || 3);
     const pessDirectProfit = pessIncome - Math.floor(directCost * 1.01);
     const pessCraftProfit = pessIncome - Math.floor(craftCost * 1.01) - oppCost;
@@ -1915,7 +2127,7 @@ function calcFreight() {
     const totalProfit = selected.reduce((s,r) => s + r.betterProfit, 0);
     const pessTotal = selected.reduce((s,r) => s + (r.pessBetterProfit||0), 0);
     const bonus = bonusMap[n] * treasureIncome;
-    const pessBonus = bonusMap[n] * Math.floor(treasureIncome * ((parseInt(localStorage.getItem("pessimisticRate"))||90)/100));
+    const pessBonus = bonusMap[n] * Math.floor(treasureIncome * pessRate);
     return { n, totalProfit, bonus, grandTotal: totalProfit + bonus, pessTotal, pessBonus, pessGrand: pessTotal + pessBonus };
   });
   
@@ -1982,6 +2194,16 @@ function toggleCompact() {
   const btn = document.getElementById('compactToggle');
   if (btn) btn.style.background = isCompact ? '' : 'var(--gold)';
   if (btn) btn.style.color = isCompact ? '' : '#1a1a2e';
+  // 进入紧凑模式时，被隐藏列（原料成本/基础利润率）不能作为当前排序字段
+  if (!isCompact) {
+    ['potion', 'cultivate'].forEach(cat => {
+      if (sortState[cat].field === 'cost' || sortState[cat].field === 'profitRate') {
+        sortState[cat] = { field: 'profit', asc: false };
+        renderProductTable(cat);
+      }
+    });
+    localStorage.setItem('mmo_craft_sort', JSON.stringify(sortState));
+  }
   localStorage.setItem('mmo_craft_compact', isCompact ? 'false' : 'true');
 }
 function switchTheme(val) {
@@ -1989,20 +2211,25 @@ function switchTheme(val) {
   localStorage.setItem('mmo_craft_theme', val);
 }
 
-function toggleLeftPanel() {
-  leftPanelVisible = !leftPanelVisible;
+function applyLeftPanel() {
   const panel = document.getElementById('leftPanel');
   const btn = document.getElementById('toggleLeftBtn');
   const container = document.querySelector('.main-container');
   if (leftPanelVisible) {
     panel.style.display = '';
-    container.style.gridTemplateColumns = '300px 1fr';
+    // Clear inline override so the 1024px responsive layout still applies
+    container.style.gridTemplateColumns = '';
     btn.textContent = '◀ 收起';
   } else {
     panel.style.display = 'none';
     container.style.gridTemplateColumns = '1fr';
     btn.textContent = '▶ 材料';
   }
+}
+function toggleLeftPanel() {
+  leftPanelVisible = !leftPanelVisible;
+  localStorage.setItem('mmo_craft_left_panel', leftPanelVisible ? 'true' : 'false');
+  applyLeftPanel();
 }
 
 function initDragDrop() {
@@ -2098,30 +2325,24 @@ function onDrop(e) {
     if (cb) { cb.style.background = 'var(--gold)'; cb.style.color = '#1a1a2e'; }
   }
 })();
+applyLeftPanel();
 renderAll();
 loadFreightData();
 initFreightDrag();
 initDragDrop();
 if (nickname) document.getElementById("nickDisplay").textContent = "\u{1F464} " + nickname;
-if (nickname) document.getElementById("nickDisplay").textContent = "\u{1F464} " + nickname;
-// 后台尝试云端连接
-initCloud();
-if (cloudEnabled) {
+// 后台尝试云端连接（SDK 懒加载，不影响首屏渲染）
+initCloud().then(ok => {
+  if (!ok) return;
   cloudListen();
   cloudLoad().then(d => {
-    if (d) {
-      data = d;
-      // 恢复本地 doubleChance（不从云端覆盖）
-      try { var dc = JSON.parse(localStorage.getItem('mmo_doubleChance')||'{}'); data.products.forEach(function(p) { if (dc[p.id] !== undefined) p.doubleChance = dc[p.id]; }); } catch(e) {}
-      loadFreightData();
-      renderAll();
-    }
+    if (d) applyCloudData(d);
   });
   // 记录访问日志
   fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{
     sbClient.from('visits').insert({ip:d.ip, user_agent:navigator.userAgent}).then(()=>{});
   }).catch(()=>{});
-}
+});
 </script>
 
 </body>
