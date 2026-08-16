@@ -334,6 +334,27 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
 .freight-summary { margin-top: 8px; padding: 8px; background: var(--bg-card-alt); border-radius: var(--radius-sm); font-size: 0.8rem; display: none; }
 .freight-summary table { font-size: 0.8rem; }
 .freight-summary td { padding: 3px 6px; }
+/* 货运结果表头：悬停显示列说明与计算公式 */
+.freight-summary thead th {
+  cursor: default; padding: 6px 6px; border-bottom: 1px solid var(--border);
+  font-size: 0.72rem; color: var(--text-dim);
+}
+.freight-summary thead th:hover { color: var(--text-dim); }
+.th-tip { position: relative; cursor: help; border-bottom: 1px dashed var(--text-dim); padding-bottom: 1px; }
+.th-tip .tip-popup {
+  display: none; position: absolute; top: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card); border: 1px solid var(--border-focus);
+  border-radius: var(--radius-sm); padding: 8px 12px;
+  z-index: 80; width: max-content; max-width: 320px; white-space: normal;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  font-size: 0.72rem; color: var(--text); font-weight: normal;
+  line-height: 1.7; pointer-events: none; text-align: left;
+}
+.th-tip:hover .tip-popup { display: block; }
+/* 首列/末列的工具提示改为单侧展开，避免超出屏幕 */
+.th-tip.tip-start .tip-popup { left: 0; transform: none; }
+.th-tip.tip-end .tip-popup { left: auto; right: 0; transform: none; }
 
 /* ========== Trend Chart ========== */
 #trendChartContainer { position: relative; }
@@ -604,6 +625,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
           <label style="font-size:0.7rem;color:var(--text-dim);margin-left:6px;">悲观:</label> <input type="number" id="pessimisticRate" value="90" min="50" max="100" step="1" class="mini-input" style="width:55px;" onchange="savePessimisticRate()">%
           <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">乾坤寻宝图:</label> <input type="number" id="kunPrice" value="0" min="1" step="1" class="mini-input" style="width:80px;" onchange="saveKunPrice()"> G
           <label style="font-size:0.7rem;color:var(--text-dim);">比例:</label> <input type="number" id="kunRate" value="97.5" min="50" max="100" step="0.1" class="mini-input" style="width:60px;" onchange="saveKunRate()">%
+          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">体力机会成本:</label> <input type="number" id="customOppCost" value="" min="0" step="0.1" placeholder="自动" class="mini-input" style="width:70px;" title="留空时自动计算：前5名「单位体力期望利润」平均值 × 0.98" onchange="saveCustomOppCost()"> G/体
           <button class="btn btn-primary btn-sm" onclick="calcFreight()">📊 计算最优</button>
           <button class="btn btn-sm btn-danger" onclick="clearAllFreightSlots()" title="清空全部 8 个货运槽位（保留预设方案库）">🗑 一键清空</button>
         </span>
@@ -1851,6 +1873,7 @@ let treasurePrice = 0;
 let pessimisticRate = 90;
 let kunPrice = 0;
 let kunRate = 97.5;     // synced
+let customOppCost = 0;  // local only: 0 = 自动计算
 
 function updateTreasureModInfo() {
   var ph = (data.priceHistory||{})["treasure_treasure"];
@@ -1878,6 +1901,9 @@ function loadFreightData() {
   const localKunRate = parseFloat(localStorage.getItem("kunRate")) || 97.5;
   kunRate = (data.kunRate !== undefined) ? (Number(data.kunRate) || 97.5) : localKunRate;
   document.getElementById("kunRate").value = kunRate;
+  // 体力机会成本：个人设置，仅本地保存；0/留空 = 自动计算
+  customOppCost = parseFloat(localStorage.getItem("customOppCost")) || 0;
+  document.getElementById("customOppCost").value = customOppCost > 0 ? customOppCost : '';
   document.getElementById('treasurePrice').value = treasurePrice;
   updateTreasureModInfo();
   // Load local slots
@@ -1902,6 +1928,18 @@ function saveKunRate() {
   localStorage.setItem("kunRate", kunRate);
   data.kunRate = kunRate;
   saveData();
+}
+
+function saveCustomOppCost() {
+  const v = parseFloat(document.getElementById("customOppCost").value);
+  if (isNaN(v) || v <= 0) {
+    customOppCost = 0;
+    localStorage.removeItem("customOppCost");
+    document.getElementById("customOppCost").value = '';
+  } else {
+    customOppCost = v;
+    localStorage.setItem("customOppCost", String(v));
+  }
 }
 
 function saveTreasurePrice() {
@@ -2084,9 +2122,10 @@ function calcFreight() {
   // Pessimistic: treasure ×0.9, cost ×1.01（个人设置，读取本地变量）
   const pessRate = (pessimisticRate || 90) / 100;
   
-  // Get top 3 staminaExpectedProfit from products
+  // 体力机会成本：自定义值优先；未设置时 = 前5名「单位体力期望利润」平均值 × 0.98
   const ranked = data.products.map(p => calcProduct(p)).filter(c => c.staminaExpectedProfit > 0).sort((a,b) => b.staminaExpectedProfit - a.staminaExpectedProfit);
-  const top3Avg = ranked.slice(0, 3).reduce((s,c) => s + c.staminaExpectedProfit, 0) / Math.min(3, ranked.length) || 0;
+  const top5Avg = ranked.slice(0, 5).reduce((s,c) => s + c.staminaExpectedProfit, 0) / Math.min(5, ranked.length) || 0;
+  const oppCostRate = customOppCost > 0 ? customOppCost : top5Avg * 0.98;
   
   // Calculate each slot
   const results = active.map(slot => {
@@ -2096,7 +2135,7 @@ function calcFreight() {
     const directCost = prod.sellPrice * slot.qty; // buying
     const craftCost = calc.cost * slot.qty; // crafting
     const staminaCost = (prod.staminaCost / (prod.baseOutput || 1)) * slot.qty;
-    const oppCost = staminaCost * top3Avg; // opportunity cost of stamina
+    const oppCost = staminaCost * oppCostRate; // opportunity cost of stamina
     const income = treasureIncome * (slot.rewardQty || 3);
     
     const directProfit = income - directCost;
@@ -2149,8 +2188,16 @@ function calcFreight() {
   // Show summary
   const summary = document.getElementById('freightSummary');
   summary.style.display = 'block';
-  summary.innerHTML = '<b>📊 计算结果</b>（体力机会成本：' + fmtDec(top3Avg,1) + ' G/体）&nbsp; 悲观=残片×0.9 成本×1.01<br>' +
-    '<table style="font-size:0.75rem;">' + results.map((r, i) => {
+  const thCell = (label, tip, pos) => '<th><span class="th-tip' + (pos ? ' ' + pos : '') + '">' + label + ' ℹ<span class="tip-popup">' + tip + '</span></span></th>';
+  summary.innerHTML = '<b>📊 计算结果</b>（体力机会成本：' + fmtDec(oppCostRate,1) + ' G/体' + (customOppCost > 0 ? '，自定义' : '，自动=前5名均值×0.98') + '）&nbsp; 悲观=残片×0.9 成本×1.01<br>' +
+    '<table style="font-size:0.75rem;"><thead><tr>' +
+    thCell('排名', '按「最优」利润从高到低排序<br>✅ = 推荐提交<br>❌ = 利润不足，建议跳过', 'tip-start') +
+    thCell('方案', '产物名称 × 提交数量<br>→ 可获得的残片数') +
+    thCell('买', '直接购买成品提交：<br><b>买 = 残片税后收入 × 残片数 − 售价 × 提交数量</b><br>残片税后收入 = ⌊宝图残片售价 × 0.95⌋') +
+    thCell('搓', '自己制作成品提交：<br><b>搓 = 残片税后收入 × 残片数 − 原料成本 × 提交数量 − 体力消耗 × 体力机会成本</b><br>体力机会成本 = 自定义值；未设置时 = 全体产物「单位体力期望利润」前5名平均值 × 0.98') +
+    thCell('最优', '该方案推荐采用的实际利润：<br><b>最优 = max(买, 搓)</b><br>表格中金色一列表示当前更划算的方式') +
+    thCell('悲观', '行情变差时重新计算：<br><b>悲观买 = 残片收入 × 悲观比例 − 购买成本 × 1.01</b><br><b>悲观搓 = 残片收入 × 悲观比例 − 原料成本 × 1.01 − 体力机会成本</b><br>再取两者较大值', 'tip-end') +
+    '</tr></thead><tbody>' + results.map((r, i) => {
       const marker = i < best.n ? '✅ 第' + (i+1) + '名' : '❌ 跳过';
       const buyStr = '' + (r.directProfit>=0?'+':'') + fmtGold(r.directProfit);
       const craftStr = '' + (r.craftProfit>=0?'+':'') + fmtGold(r.craftProfit);
