@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>逆水寒黄金畅玩服·生活技能利润计算器</title>
+<meta name="description" content="逆水寒生活技能利润计算器：材料/产物成本收益、体力利润、帮会货运（普通/高级）计算，支持本地与云端同步。">
+<meta name="theme-color" content="#0f0f1a">
 <style>
 /* ========== Reset & Variables ========== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -65,6 +67,15 @@ body {
 }
 .header h1 .icon { font-size: 1.6rem; }
 .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cloud-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-card);
+  font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;
+}
+.cloud-status.ok { color: var(--green); border-color: #2a5a3a; background: #1a3a2a; }
+.cloud-status.off { color: var(--orange); border-color: #5a4a2a; background: #3a322a; }
+.cloud-status.err { color: var(--red); border-color: #5a2a2a; background: #3a1a1a; }
 
 /* ========== Buttons ========== */
 .btn {
@@ -149,10 +160,10 @@ body {
   color: var(--text-bright);
 }
 .material-item .price {
-  font-weight: 700; color: var(--gold); font-size: 1.35rem;
+  font-weight: 700; color: var(--gold); font-size: 1.5rem;
   min-width: 50px; text-align: right;
 }
-.material-item .price .unit { font-size: 0.65rem; color: var(--text-dim); margin-left: 1px; }
+.material-item .price .unit { font-size: 0.72rem; color: var(--text-dim); margin-left: 1px; }
 .material-item .actions { display: flex; gap: 2px; }
 .material-item .tag {
   font-size: 0.62rem; padding: 1px 6px; border-radius: 10px;
@@ -164,9 +175,9 @@ body {
 
 /* ========== Inline Edit ========== */
 .inline-price-input {
-  width: 84px; min-height: 30px; padding: 4px 6px; border-radius: 4px;
+  width: 92px; min-height: 32px; padding: 5px 6px; border-radius: 4px;
   border: 1px solid var(--border); background: var(--bg-input);
-  color: var(--gold); font-weight: 700; font-size: 0.88rem;
+  color: var(--gold); font-weight: 700; font-size: 0.95rem;
   text-align: right; font-family: inherit;
 }
 .inline-price-input:focus { outline: none; border-color: var(--gold); }
@@ -192,16 +203,26 @@ input[type=number] { -moz-appearance: textfield; }
 .add-form input.price-input { flex: 1; min-width: 55px; }
 
 /* ========== Products Table ========== */
-.table-wrapper { overflow-x: auto; margin-top: 6px; }
+.table-wrapper { overflow-x: auto; margin-top: 6px; position: relative; }
+/* 横向滚动表格冻结首列，移动端更容易辨识 */
+.table-wrapper th:first-child,
+.table-wrapper td:first-child {
+  position: sticky; left: 0; z-index: 2; background: var(--bg-card);
+}
+.table-wrapper thead th:first-child { z-index: 3; }
+.table-wrapper td:first-child { box-shadow: 2px 0 6px rgba(0,0,0,0.08); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
 table {
-  width: 100%; border-collapse: collapse; font-size: 0.9rem;
-  table-layout: auto;
+  width: 100%; border-collapse: collapse; font-size: 0.95rem;
+  table-layout: auto; font-variant-numeric: tabular-nums;
 }
 thead th {
-  padding: 9px 6px; text-align: right; font-weight: 700;
+  padding: 10px 6px; text-align: right; font-weight: 700;
   color: var(--text-dim); border-bottom: 2px solid var(--border);
   white-space: nowrap; cursor: pointer; user-select: none;
-  transition: color 0.15s; position: relative; font-size: 0.84rem;
+  transition: color 0.15s; position: relative; font-size: 0.88rem;
 }
 thead th:first-child { text-align: left; }
 thead th:hover { color: var(--text-bright); }
@@ -209,7 +230,8 @@ thead th .sort-arrow { font-size: 0.65rem; margin-left: 2px; opacity: 0.4; }
 thead th.sorted .sort-arrow { opacity: 1; color: var(--gold); }
 thead th.sorted { color: var(--gold); }
 tbody td {
-  padding: 9px 6px; text-align: right;
+  padding: 10px 6px; text-align: right;
+  font-size: 0.95rem; font-variant-numeric: tabular-nums;
   border-bottom: 1px solid rgba(255,255,255,0.04);
   white-space: nowrap;
 }
@@ -261,7 +283,7 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
   border-radius: var(--radius-sm); padding: 7px 12px;
   text-align: center; flex: 1; min-width: 80px;
 }
-.stat-item .stat-value { font-size: 1.1rem; font-weight: 700; color: var(--gold); }
+.stat-item .stat-value { font-size: 1.2rem; font-weight: 700; color: var(--gold); }
 .stat-item .stat-label { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
 
 /* ========== Toast ========== */
@@ -321,6 +343,43 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
 .freight-slot.filled .slot-clear { display: block; }
 .freight-slot .slot-clear:hover { color: var(--red); }
 
+.freight-tabs {
+  display: flex; gap: 6px; margin-bottom: 8px;
+}
+.freight-tab {
+  padding: 5px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--bg-card); color: var(--text-dim); font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.freight-tab:hover { border-color: var(--border-focus); }
+.freight-tab.active { background: var(--gold); color: #1a1a2e; border-color: var(--gold); }
+body[data-compact="true"] .freight-tab { padding: 4px 10px; font-size: 0.75rem; }
+
+.normal-task-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px; margin-top: 6px;
+}
+.normal-task-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-card-alt);
+}
+.normal-task-row select { flex: 1 1 130px; min-width: 100px; font-size: 0.88rem; }
+.normal-task-row input { width: 74px; min-height: 30px; font-size: 0.9rem; }
+.normal-task-row .reward-label { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; }
+.normal-exclude-box {
+  margin-top: 10px; padding: 8px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg-card-alt);
+}
+.normal-exclude-box label { font-size: 0.75rem; color: var(--text-dim); display: block; margin-bottom: 4px; }
+.normal-exclude-box textarea {
+  width: 100%; min-height: 56px; padding: 5px 7px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--bg-input); color: var(--text);
+  font-size: 0.78rem; font-family: inherit; resize: vertical;
+}
+.normal-exclude-box textarea:focus { outline: none; border-color: var(--border-focus); }
+.normal-exclude-box .btn { margin-top: 5px; }
+
 .preset-list { max-height: 240px; overflow-y: auto; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
 .preset-item {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
@@ -332,7 +391,7 @@ tbody tr:hover { background: rgba(255,255,255,0.16); }
 .preset-item .preset-info { color: var(--text-dim); font-size: 0.7rem; }
 
 .freight-summary { margin-top: 8px; padding: 8px; background: var(--bg-card-alt); border-radius: var(--radius-sm); font-size: 0.8rem; display: none; }
-.freight-summary table { font-size: 0.8rem; }
+.freight-summary table { font-size: 0.88rem; }
 .freight-summary td { padding: 3px 6px; }
 /* 货运结果表头：悬停显示列说明与计算公式 */
 .freight-summary thead th {
@@ -371,6 +430,10 @@ body[data-theme="light"] {
 }
 body[data-theme="light"] tbody tr:nth-child(even) { background: rgba(0,0,0,0.05); }
 body[data-theme="light"] tbody tr:hover { background: rgba(0,0,0,0.08); }
+body[data-theme="light"] .btn:hover { background: #e8eaf0; }
+body[data-theme="light"] .btn-danger:hover { background: #fdeaea; border-color: var(--red); }
+body[data-theme="light"] .freight-slot:hover { background: rgba(0,0,0,0.04); }
+body[data-theme="light"] .material-item:hover { background: rgba(0,0,0,0.04); }
 body[data-theme="warm"] {
   --bg: #0f1a14; --bg-card: #16231c; --bg-card-alt: #1a2a22; --bg-input: #0f1a14;
   --border: #263d30; --border-focus: #4a7a5c;
@@ -426,10 +489,10 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
 
 /* Compact inline controls (trend select, freight header inputs) */
 .mini-input, .mini-select {
-  padding: 5px 7px; border-radius: 4px;
+  padding: 6px 8px; border-radius: 4px;
   border: 1px solid var(--border); background: var(--bg-input);
-  color: var(--text); font-size: 0.8rem; font-family: inherit;
-  min-height: 30px;
+  color: var(--text); font-size: 0.85rem; font-family: inherit;
+  min-height: 32px;
 }
 .mini-input:focus, .mini-select:focus { outline: none; border-color: var(--border-focus); }
 
@@ -478,18 +541,19 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
 <div class="header">
   <h1><span class="icon">⚒️</span>逆水寒黄金畅玩服·生活技能利润计算器</h1>
   <div class="header-actions">
-    <button class="btn btn-sm" onclick="exportData()" title="导出数据为JSON文件">📥 导出</button>
-    <button class="btn btn-sm" onclick="document.getElementById('importFile').click()">📤 导入</button>
-    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
-    <select class="theme-select" id="themeSelect" onchange="switchTheme(this.value)">
+    <span class="cloud-status" id="cloudStatus" title="云端同步状态">☁️ 检测中</span>
+    <button class="btn btn-sm" data-action="exportData" title="导出数据为JSON文件">📥 导出</button>
+    <button class="btn btn-sm" data-action="importClick">📤 导入</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" >
+    <select class="theme-select" id="themeSelect" >
       <option value="default">🌙 默认</option>
       <option value="light">☀️ 浅色</option>
       <option value="warm">🌿 深绿</option>
       </select>
-    <button class="btn btn-sm" id="compactToggle" onclick="toggleCompact()">📐 紧凑</button>
-    <button class="btn btn-sm" id="toggleLeftBtn" onclick="toggleLeftPanel()">◀ 收起</button>
-    <button class="btn btn-sm" id="trendToggleBtn" onclick="toggleTrend()">📈 趋势图</button>
-    <button class="btn btn-sm btn-danger" onclick="resetAll()">🗑️ 清空</button>
+    <button class="btn btn-sm" id="compactToggle" data-action="toggleCompact">📐 紧凑</button>
+    <button class="btn btn-sm" id="toggleLeftBtn" data-action="toggleLeftPanel">◀ 收起</button>
+    <button class="btn btn-sm" id="trendToggleBtn" data-action="toggleTrend">📈 趋势图</button>
+    <button class="btn btn-sm btn-danger" data-action="resetAll">🗑️ 清空</button>
   </div>
 </div>
 
@@ -512,7 +576,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
       <div class="add-form">
         <input type="text" class="name-input" id="plyCulName" placeholder="材料名称">
         <input type="number" class="price-input" id="plyCulPrice" placeholder="单价" min="1" step="1">
-        <button class="btn btn-primary btn-sm" onclick="addPlayerMaterial('cultivate')">+ 添加</button>
+        <button class="btn btn-primary btn-sm" data-action="addPlayerMaterial" data-cat="cultivate">+ 添加</button>
       </div>
     </div>
 
@@ -529,7 +593,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
       <div class="add-form">
         <input type="text" class="name-input" id="plyPotName" placeholder="材料名称">
         <input type="number" class="price-input" id="plyPotPrice" placeholder="单价" min="1" step="1">
-        <button class="btn btn-primary btn-sm" onclick="addPlayerMaterial('potion')">+ 添加</button>
+        <button class="btn btn-primary btn-sm" data-action="addPlayerMaterial" data-cat="potion">+ 添加</button>
       </div>
     </div>
 
@@ -546,7 +610,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
       <div class="add-form">
         <input type="text" class="name-input" id="sysMatName" placeholder="材料名称">
         <input type="number" class="price-input" id="sysMatPrice" placeholder="单价" min="1" step="1">
-        <button class="btn btn-primary btn-sm" onclick="addSystemMaterial()">+ 添加</button>
+        <button class="btn btn-primary btn-sm" data-action="addSystemMaterial">+ 添加</button>
       </div>
     </div>
   </div>
@@ -563,7 +627,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
       <div class="stat-item" id="statLastUpdate" style="display:none;"><div class="stat-value" style="font-size:0.8rem;color:var(--text-dim);" id="statUpdateInfo">--</div><div class="stat-label">最后更新</div></div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:0.72rem;color:var(--text-dim);">
-      <span id="nickDisplay" style="cursor:pointer;" onclick="setNickname()" title="点击设置昵称">👤 未设置昵称</span>
+      <span id="nickDisplay" style="cursor:pointer;" data-action="setNickname" title="点击设置昵称">👤 未设置昵称</span>
     </div>
 
     <!-- Trend Chart (hidden) -->
@@ -571,18 +635,18 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
       <div class="card-header">
         <h2 style="display:flex;align-items:center;gap:6px;">📈 价格趋势</h2>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <select id="trendCatSelect" onchange="onTrendCatChange()" class="mini-select" style="max-width:180px;">
+          <select id="trendCatSelect"  class="mini-select" style="max-width:180px;">
             <option value="">-- 选择分类 --</option>
             <option value="prod-potion">产物 · 药品恢复类</option>
             <option value="prod-cultivate">产物 · 养成材料类</option>
             <option value="mat-potion">玩家材料 · 药品恢复类</option>
             <option value="mat-cultivate">玩家材料 · 养成材料类</option><option value="treasure">💎 宝图残片</option>
           </select>
-          <select id="trendItemSelect" onchange="renderTrendChart()" class="mini-select" style="max-width:220px;">
+          <select id="trendItemSelect"  class="mini-select" style="max-width:220px;">
             <option value="">-- 选择物品 --</option>
           </select>
-          <button class="btn btn-xs btn-danger" onclick="clearTrendHistory()" title="清除当前物品的历史数据" style="margin-left:4px;">🗑 清除</button>
-          <button class="btn btn-xs" onclick="toggleTrend()">✕ 关闭</button>
+          <button class="btn btn-xs btn-danger" data-action="clearTrendHistory" title="清除当前物品的历史数据" style="margin-left:4px;">🗑 清除</button>
+          <button class="btn btn-xs" data-action="toggleTrend">✕ 关闭</button>
         </div>
       </div>
       <div id="trendChartContainer" style="height:320px;position:relative;">
@@ -599,7 +663,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
         <h2><span class="dot dot-cultivate"></span>产物 · 养成材料类</h2>
         <span style="display:flex;align-items:center;gap:6px;">
           <span title="拖动排序" style="cursor:grab;font-size:1rem;color:var(--text-dim);">⠿</span>
-          <button class="btn btn-primary btn-sm" onclick="toggleProductForm('cultivate')">+ 添加产物</button>
+          <button class="btn btn-primary btn-sm" data-action="toggleProductForm" data-cat="cultivate">+ 添加产物</button>
         </span>
       </div>
       <div id="productFormCultivate" style="display:none;"></div>
@@ -618,26 +682,53 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
     <!-- 高级帮会货运 -->
     <div class="card drag-card" id="card-freight">
       <div class="card-header drag-handle" draggable="true">
-        <h2 style="display:flex;align-items:center;gap:6px;">🚚 高级帮会货运</h2>
-        <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <h2 style="display:flex;align-items:center;gap:6px;">🚚 帮会货运</h2>
+        <span id="advFreightControls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <label style="font-size:0.75rem;color:var(--text-dim);">宝图残片售价:</label>
-          <span class="info-tip" id="treasureTip" style="font-size:0.7rem;margin-right:4px;">ℹ<span class="tip-popup" id="treasureModInfo"></span></span><input type="number" id="treasurePrice" value="0" min="1" step="1" class="mini-input" style="width:80px;" onchange="saveTreasurePrice()"> G
-          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:6px;">悲观:</label> <input type="number" id="pessimisticRate" value="90" min="50" max="100" step="1" class="mini-input" style="width:55px;" onchange="savePessimisticRate()">%
-          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">乾坤寻宝图:</label> <input type="number" id="kunPrice" value="0" min="1" step="1" class="mini-input" style="width:80px;" onchange="saveKunPrice()"> G
-          <label style="font-size:0.7rem;color:var(--text-dim);">比例:</label> <input type="number" id="kunRate" value="97.5" min="50" max="100" step="0.1" class="mini-input" style="width:60px;" onchange="saveKunRate()">%
-          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">体力机会成本:</label> <input type="number" id="customOppCost" value="" min="0" step="0.1" placeholder="自动" class="mini-input" style="width:70px;" title="留空时自动计算：前5名「单位体力期望利润」平均值 × 0.98" onchange="saveCustomOppCost()"> G/体
-          <button class="btn btn-primary btn-sm" onclick="calcFreight()">📊 计算最优</button>
-          <button class="btn btn-sm btn-danger" onclick="clearAllFreightSlots()" title="清空全部 8 个货运槽位（保留预设方案库）">🗑 一键清空</button>
+          <span class="info-tip" id="treasureTip" style="font-size:0.7rem;margin-right:4px;">ℹ<span class="tip-popup" id="treasureModInfo"></span></span><input type="number" id="treasurePrice" value="0" min="1" step="1" class="mini-input" style="width:80px;" > G
+          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:6px;">悲观:</label> <input type="number" id="pessimisticRate" value="90" min="50" max="100" step="1" class="mini-input" style="width:55px;" >%
+          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">乾坤寻宝图:</label> <input type="number" id="kunPrice" value="0" min="1" step="1" class="mini-input" style="width:80px;" > G
+          <label style="font-size:0.7rem;color:var(--text-dim);">比例:</label> <input type="number" id="kunRate" value="97.5" min="50" max="100" step="0.1" class="mini-input" style="width:60px;" >%
+          <label style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">体力机会成本:</label> <input type="number" id="customOppCost" value="" min="0" step="0.1" placeholder="自动" class="mini-input" style="width:70px;" title="留空时自动计算：前5名「单位体力期望利润」平均值 × 0.98" > G/体
+          <button class="btn btn-primary btn-sm" data-action="calcFreight">📊 计算最优</button>
+          <button class="btn btn-sm btn-danger" data-action="clearAllFreightSlots" title="清空全部 8 个货运槽位（保留预设方案库）">🗑 一键清空</button>
         </span>
       </div>
+        <div class="freight-tabs">
+          <button type="button" class="freight-tab" id="tabNormal" data-action="switchFreightTab" data-tab="normal">📋 普通货运</button>
+          <button type="button" class="freight-tab active" id="tabAdv" data-action="switchFreightTab" data-tab="adv">🚚 高级货运</button>
+        </div>
+
+        <div id="normalFreightPanel" style="display:none;">
+          <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:6px;">📜 普通帮贡任务：每人的任务不同，请按实际刷到的添加。累计提交额外奖励（每周只领 1 次，不叠加）：5次 +20000交子+108帮贡 ｜ 6次 +24000+126 ｜ 7次 +28000+144 ｜ 8次 +32000+162</div>
+          <div id="normalTaskList" class="normal-task-list"></div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm" data-action="addNormalTask">+ 添加任务</button>
+            <button class="btn btn-primary btn-sm" data-action="calcNormalFreight">📊 计算最优</button>
+          </div>
+          <div class="normal-exclude-box">
+            <label for="normalExcludeInput">🚫 普通货运排除商品（每行一个或逗号分隔，保存后相关任务会被自动移除）</label>
+            <textarea id="normalExcludeInput" placeholder="默认已排除：百炼*鉴定书、山河灵玉、神器秘印、稀世残符"></textarea>
+            <button class="btn btn-sm" data-action="saveNormalExcludes">保存排除</button>
+          </div>
+          <div class="table-wrapper" style="margin-top:8px;">
+            <table id="normalFreightTable">
+              <thead id="normalFreightThead"></thead>
+              <tbody id="normalFreightBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="advFreightPanel">
       <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:6px;">点击空槽位从下方选择方案 &nbsp;|&nbsp; 额外奖励：5个→18残片 | 6→22 | 7→28 | 8→35</div>
       <div class="freight-grid" id="freightGrid"></div>
       <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:0.8rem;font-weight:700;color:var(--text-bright);">📋 预设方案库 <span style="font-weight:400;color:var(--text-dim);font-size:0.7rem;">（点击添加到槽位）</span></span>
-        <button class="btn btn-sm" onclick="addFreightPreset()">+ 添加方案</button>
+        <button class="btn btn-sm" data-action="addFreightPreset">+ 添加方案</button>
       </div>
       <div class="preset-list" id="presetList"></div>
       <div class="freight-summary" id="freightSummary"></div>
+        </div>
     </div>
 
 
@@ -647,7 +738,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
         <h2><span class="dot dot-potion"></span>产物 · 药品恢复类</h2>
         <span style="display:flex;align-items:center;gap:6px;">
           <span title="拖动排序" style="cursor:grab;font-size:1rem;color:var(--text-dim);">⠿</span>
-          <button class="btn btn-primary btn-sm" onclick="toggleProductForm('potion')">+ 添加产物</button>
+          <button class="btn btn-primary btn-sm" data-action="toggleProductForm" data-cat="potion">+ 添加产物</button>
         </span>
       </div>
       <div id="productFormPotion" style="display:none;"></div>
@@ -674,6 +765,7 @@ body[data-compact="true"] .btn-sm { padding: 3px 7px; font-size: 0.73rem; }
 <script>
 // ==================== DATA STORE ====================
 const STORAGE_KEY = 'mmo_craft_cloud_v1';
+const DATA_VERSION = 2; // 数据结构版本，用于自动迁移/兼容
 const SUPABASE_URL = 'https://voreyobicculgcfudfae.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_AijTqALCInLK0Ip6bokqgA__wSHIlle';
 
@@ -702,6 +794,13 @@ function updateLastUpdate() {
 let sbClient = null;
 let cloudEnabled = false;
 
+function setCloudStatus(txt, cls) {
+  const el = document.getElementById('cloudStatus');
+  if (!el) return;
+  el.textContent = txt;
+  el.className = 'cloud-status' + (cls ? ' ' + cls : '');
+}
+
 // Lazy-load Supabase SDK on first cloud attempt (keeps initial page parse fast)
 let sbLoadPromise = null;
 function loadSupabaseJs() {
@@ -710,6 +809,8 @@ function loadSupabaseJs() {
   sbLoadPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    s.integrity = 'sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC';
+    s.crossOrigin = 'anonymous';
     s.onload = () => (window.supabase && window.supabase.createClient) ? resolve(window.supabase) : reject(new Error('Supabase SDK 加载异常'));
     s.onerror = () => { sbLoadPromise = null; reject(new Error('Supabase SDK 网络加载失败')); };
     document.head.appendChild(s);
@@ -718,14 +819,17 @@ function loadSupabaseJs() {
 }
 
 async function initCloud() {
+  setCloudStatus('☁️ 连接中…', '');
   try {
     const sb = await loadSupabaseJs();
     sbClient = sb.createClient(SUPABASE_URL, SUPABASE_KEY);
     cloudEnabled = true;
+    setCloudStatus('☁️ 云端已连接', 'ok');
     return true;
   } catch(e) {
     console.warn('[cloud] 云端功能不可用：', e);
     cloudEnabled = false;
+    setCloudStatus('⚠️ 离线 · 仅本地', 'off');
     return false;
   }
 }
@@ -767,11 +871,16 @@ function applyCloudData(d) {
 
 async function cloudSave(d) {
   if (!cloudEnabled || !sbClient) return;
+  setCloudStatus('☁️ 同步中…', '');
   try {
     var uploadData = JSON.parse(JSON.stringify(d));
     uploadData.products.forEach(function(p) { delete p.doubleChance; });
     await sbClient.from('game_data').upsert({ id: 'v2', data: uploadData, updated_at: new Date().toISOString() });
-  } catch(e) { console.warn('[cloud] 保存失败：', e); }
+    setCloudStatus('☁️ 已同步', 'ok');
+  } catch(e) {
+    console.warn('[cloud] 保存失败：', e);
+    setCloudStatus('⚠️ 同步失败', 'err');
+  }
 }
 
 // Debounced cloud save: merge bursts of edits into one upsert, preserving order.
@@ -847,10 +956,11 @@ function loadData() {
       if (d.pessimisticRate !== undefined) delete d.pessimisticRate;
       if (!d.lastUpdatedBy) d.lastUpdatedBy = "";
       if (!d.lastUpdatedAt) d.lastUpdatedAt = "";
+      d.schemaVersion = DATA_VERSION;
       return d;
     }
   } catch(e) {}
-  return { systemMaterials: [], playerMaterials: [], products: [], priceHistory: {}, freightPresets: [], treasurePrice: 0, lastUpdatedBy: '', lastUpdatedAt: '' };
+  return { schemaVersion: DATA_VERSION, systemMaterials: [], playerMaterials: [], products: [], priceHistory: {}, freightPresets: [], treasurePrice: 0, lastUpdatedBy: '', lastUpdatedAt: '' };
 }
 
 function saveData() {
@@ -887,6 +997,101 @@ function fmtGold(n) { return Math.round(n).toLocaleString('zh-CN'); }
 function fmtDec(n, d) { return Number(n).toFixed(d); }
 function fmtPct(n) { return Number(n).toFixed(1) + '%'; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ==================== EVENT DELEGATION ====================
+// 所有动态/静态按钮统一走 data-action，不再使用内联 onclick，方便以后加 CSP。
+document.addEventListener('click', function(e) {
+  const el = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+  if (!el) return;
+  const act = el.getAttribute('data-action');
+  switch (act) {
+    case 'exportData': exportData(); break;
+    case 'importClick': document.getElementById('importFile').click(); break;
+    case 'toggleCompact': toggleCompact(); break;
+    case 'toggleLeftPanel': toggleLeftPanel(); break;
+    case 'toggleTrend': toggleTrend(); break;
+    case 'resetAll': resetAll(); break;
+    case 'addPlayerMaterial': addPlayerMaterial(el.getAttribute('data-cat')); break;
+    case 'addSystemMaterial': addSystemMaterial(); break;
+    case 'setNickname': setNickname(); break;
+    case 'clearTrendHistory': clearTrendHistory(); break;
+    case 'toggleProductForm': toggleProductForm(el.getAttribute('data-cat')); break;
+    case 'calcFreight': calcFreight(); break;
+    case 'clearAllFreightSlots': clearAllFreightSlots(); break;
+    case 'switchFreightTab': switchFreightTab(el.getAttribute('data-tab')); break;
+    case 'addNormalTask': addNormalTask(); break;
+    case 'calcNormalFreight': calcNormalFreight(); break;
+    case 'saveNormalExcludes': saveNormalExcludes(); break;
+    case 'addFreightPreset': addFreightPreset(); break;
+    case 'addIngredientRow': addIngredientRow(el.getAttribute('data-cat')); break;
+    case 'closeProductForm': closeProductForm(); break;
+    case 'saveProduct': saveProduct(el.getAttribute('data-cat')); break;
+    case 'removeIngredient': tempIngredients.splice(parseInt(el.getAttribute('data-idx'), 10), 1); renderIngredientRows(el.getAttribute('data-cat')); break;
+    case 'editIngsRemove': editIngs_remove(parseInt(el.getAttribute('data-idx'), 10)); break;
+    case 'editIngsAdd': editIngs_add(); break;
+    case 'closeModal': closeModal(); break;
+    case 'editMaterialPrice': editMaterialPrice(el.getAttribute('data-type'), el.getAttribute('data-id')); break;
+    case 'deleteMaterial': deleteMaterial(el.getAttribute('data-type'), el.getAttribute('data-id')); break;
+    case 'editProduct': editProduct(el.getAttribute('data-id')); break;
+    case 'editProductSellPrice': editProductSellPrice(el.getAttribute('data-id')); break;
+    case 'editProductDoubleChance': editProductDoubleChance(el.getAttribute('data-id')); break;
+    case 'deleteProduct': deleteProduct(el.getAttribute('data-id')); break;
+    case 'sortProducts': sortProducts(el.getAttribute('data-cat'), el.getAttribute('data-field')); break;
+    case 'clearFreightSlot': clearFreightSlot(parseInt(el.getAttribute('data-idx'), 10)); break;
+    case 'pickPresetForSlot': pickPresetForSlot(parseInt(el.getAttribute('data-idx'), 10)); break;
+    case 'addToSlot': addToSlot(parseInt(el.getAttribute('data-idx'), 10)); break;
+    case 'deleteFreightPreset': deleteFreightPreset(parseInt(el.getAttribute('data-idx'), 10)); break;
+    case 'deleteNormalTask': deleteNormalTask(parseInt(el.getAttribute('data-idx'), 10)); break;
+    default: break;
+  }
+});
+
+document.addEventListener('change', function(e) {
+  const t = e.target;
+  if (!t || !t.id && !t.getAttribute) return;
+  if (t.id === 'importFile') { importData(e); return; }
+  if (t.id === 'themeSelect') { switchTheme(t.value); return; }
+  if (t.id === 'trendCatSelect') { onTrendCatChange(); return; }
+  if (t.id === 'trendItemSelect') { renderTrendChart(); return; }
+  if (t.id === 'treasurePrice') { saveTreasurePrice(); return; }
+  if (t.id === 'pessimisticRate') { savePessimisticRate(); return; }
+  if (t.id === 'kunPrice') { saveKunPrice(); return; }
+  if (t.id === 'kunRate') { saveKunRate(); return; }
+  if (t.id === 'customOppCost') { saveCustomOppCost(); return; }
+  const actEl = t.closest ? t.closest('[data-change]') : null;
+  if (!actEl) return;
+  const act = actEl.getAttribute('data-change');
+  if (act === 'updatePlayerPrice') {
+    updatePlayerPrice(actEl.getAttribute('data-id'), t.value);
+  } else if (act === 'ingredientSelect') {
+    const idx = parseInt(actEl.getAttribute('data-idx'), 10);
+    tempIngredients[idx].materialId = t.value;
+    tempIngredients[idx].materialType = t.selectedOptions[0].dataset.type;
+  } else if (act === 'ingredientQty') {
+    const idx = parseInt(actEl.getAttribute('data-idx'), 10);
+    tempIngredients[idx].quantity = parseInt(t.value, 10) || 1;
+  } else if (act === 'normalField') {
+    const idx = parseInt(actEl.getAttribute('data-idx'), 10);
+    normalTaskField(idx, actEl.getAttribute('data-field'), t.value);
+  }
+});
+
+// 价格输入框自动全选
+document.addEventListener('focusin', function(e) {
+  if (e.target && e.target.getAttribute && e.target.getAttribute('data-autoselect')) {
+    e.target.select();
+  }
+});
+
+// 表头键盘排序（Enter/Space）
+document.addEventListener('keydown', function(e) {
+  const th = e.target && e.target.closest ? e.target.closest('th[data-sort-field]') : null;
+  if (th && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    sortProducts(th.getAttribute('data-cat'), th.getAttribute('data-field'));
+  }
+});
+
 
 function getMaterialInfo(materialId, materialType) {
   const list = materialType === 'system' ? data.systemMaterials : data.playerMaterials;
@@ -963,8 +1168,8 @@ function renderSystemMaterials() {
       <span class="name">${esc(m.name)}</span>
       <span class="price">${fmtGold(m.price)}<span class="unit">G</span></span>
       <div class="actions">
-        <button class="btn btn-icon" onclick="editMaterialPrice('system','${m.id}')" title="修改价格" aria-label="修改价格">✎</button>
-        <button class="btn btn-del btn-danger" onclick="deleteMaterial('system','${m.id}')" title="删除" aria-label="删除">✕</button>
+        <button class="btn btn-icon" data-action="editMaterialPrice" data-type="system" data-id="${m.id}" title="修改价格" aria-label="修改价格">✎</button>
+        <button class="btn btn-del btn-danger" data-action="deleteMaterial" data-type="system" data-id="${m.id}" title="删除" aria-label="删除">✕</button>
       </div>
     </div>
   `).join('');
@@ -986,9 +1191,9 @@ function renderPlayerMaterials(cat) {
       <span class="tag ${tagClass}">${tagLabel}</span>
       <span class="name">${esc(m.name)}</span>
       <input type="number" class="inline-price-input" value="${m.price}"
-        onchange="updatePlayerPrice('${m.id}',this.value)" onfocus="this.select()" min="1">
+        data-change="updatePlayerPrice" data-id="${m.id}" data-autoselect min="1">
       <div class="actions">
-        <button class="btn btn-del btn-danger" onclick="deleteMaterial('player','${m.id}')" title="删除" aria-label="删除">✕</button>
+        <button class="btn btn-del btn-danger" data-action="deleteMaterial" data-type="player" data-id="${m.id}" title="删除" aria-label="删除">✕</button>
       </div>
     </div>
   `).join('');
@@ -1020,7 +1225,7 @@ function renderTableHead(cat) {
   th.innerHTML = '<tr>' + SORT_FIELDS.map(f => {
     const sc = curSort.field === f ? ' sorted' : '';
     const tip = titles[f] ? ` title="${titles[f]}"` : '';
-    return `<th class="${sc}" data-col="${f}" data-sort="${f}" tabindex="0" role="button" onclick="sortProducts('${cat}','${f}')" onkeydown="sortKey(event,'${cat}','${f}')"${tip}>${labels[f]} <span class="sort-arrow">⇅</span></th>`;
+    return `<th class="${sc}" data-col="${f}" data-sort="${f}" tabindex="0" role="button" data-action="sortProducts" data-cat="${cat}" data-field="${f}" data-sort-field${tip}>${labels[f]} <span class="sort-arrow">⇅</span></th>`;
   }).join('') + '<th data-col="actions">操作</th></tr>';
 }
 
@@ -1092,7 +1297,7 @@ function renderProductTable(cat) {
       else if (agoH >= 12) nameColor = 'color:var(--orange);';
     }
     return `<tr>
-      <td data-col="name"><strong style="${nameColor}">${esc(p.name)}</strong><span class="info-tip"> ℹ<span class="tip-popup"><b>体力：</b>${p.staminaCost} 体 &nbsp;|&nbsp; <b>产出：</b>${p.baseOutput||1} 个<br><b>原料：</b>${esc(ingStr)}${modInfo}</span></span><span class="edit-prod-btn" onclick="editProduct('${p.id}')" title="编辑产物" aria-label="编辑产物"> ✎</span></td>
+      <td data-col="name"><strong style="${nameColor}">${esc(p.name)}</strong><span class="info-tip"> ℹ<span class="tip-popup"><b>体力：</b>${p.staminaCost} 体 &nbsp;|&nbsp; <b>产出：</b>${p.baseOutput||1} 个<br><b>原料：</b>${esc(ingStr)}${modInfo}</span></span><span class="edit-prod-btn" data-action="editProduct" data-id="${p.id}" title="编辑产物" aria-label="编辑产物"> ✎</span></td>
       <td data-col="sellPrice">${fmtGold(p.sellPrice)} G</td>
       <td data-col="afterTax" class="income-cell">${fmtGold(p.totalIncome)} G</td>
       <td data-col="cost" class="cost-cell">${fmtGold(p.cost)} G</td>
@@ -1104,9 +1309,9 @@ function renderProductTable(cat) {
       <td data-col="staminaExpectedProfit" class="${p.staminaExpectedProfit < 0 ? 'profit-negative' : 'stamina-cell'}">${fmtDec(p.staminaExpectedProfit,1)} G/体</td>
       <td data-col="staminaExpectedLow" class="stamina-cell" style="color:var(--gold);">${fmtDec(p.staminaExpectedLow,1)} G/体</td>
       <td data-col="actions">
-        <button class="btn btn-icon" onclick="editProductSellPrice('${p.id}')" title="快速改售价" aria-label="快速改售价">💰</button>
-        <button class="btn btn-icon" onclick="editProductDoubleChance('${p.id}')" title="修改双倍概率" aria-label="修改双倍概率">🎯</button>
-        <button class="btn btn-del btn-danger" onclick="deleteProduct('${p.id}')" title="删除" aria-label="删除">✕</button>
+        <button class="btn btn-icon" data-action="editProductSellPrice" data-id="${p.id}" title="快速改售价" aria-label="快速改售价">💰</button>
+        <button class="btn btn-icon" data-action="editProductDoubleChance" data-id="${p.id}" title="修改双倍概率" aria-label="修改双倍概率">🎯</button>
+        <button class="btn btn-del btn-danger" data-action="deleteProduct" data-id="${p.id}" title="删除" aria-label="删除">✕</button>
       </td>
     </tr>`;
   }).join('');
@@ -1141,11 +1346,11 @@ function renderProductForm(cat) {
       <div class="full-width ingredients-section">
         <label>所需原料 <span style="font-weight:400;color:var(--text-dim)">（至少1种）</span></label>
         <div id="ingRows_${cat}"></div>
-        <button class="btn btn-sm" onclick="addIngredientRow('${cat}')" style="margin-top:4px;">+ 添加原料</button>
+        <button class="btn btn-sm" data-action="addIngredientRow" data-cat="${cat}" style="margin-top:4px;">+ 添加原料</button>
       </div>
       <div class="full-width" style="display:flex;gap:8px;justify-content:flex-end;margin-top:2px;">
-        <button class="btn btn-sm" onclick="closeProductForm()">取消</button>
-        <button class="btn btn-primary btn-sm" onclick="saveProduct('${cat}')">✅ 保存产物</button>
+        <button class="btn btn-sm" data-action="closeProductForm">取消</button>
+        <button class="btn btn-primary btn-sm" data-action="saveProduct" data-cat="${cat}">✅ 保存产物</button>
       </div>
     </div>
   `;
@@ -1160,7 +1365,7 @@ function renderIngredientRows(cat) {
     const mats = idx === 0 ? systemMaterialsForSelect() : allMaterialsForSelectReordered(cat);
     return `
     <div class="ingredient-row">
-      <select onchange="tempIngredients[${idx}].materialId=this.value;tempIngredients[${idx}].materialType=this.selectedOptions[0].dataset.type;">
+      <select data-change="ingredientSelect" data-idx="${idx}">
         <option value="">-- 选择材料 --</option>
         ${mats.map(m => {
           const sel = (m.id === ing.materialId && m.type === ing.materialType) ? 'selected' : '';
@@ -1168,8 +1373,8 @@ function renderIngredientRows(cat) {
         }).join('')}
       </select>
       <input type="number" value="${ing.quantity}" min="1" placeholder="数量"
-        onchange="tempIngredients[${idx}].quantity=parseInt(this.value)||1">
-      <button class="btn btn-del btn-danger" aria-label="移除原料" onclick="tempIngredients.splice(${idx},1);renderIngredientRows('${cat}');">✕</button>
+        data-change="ingredientQty" data-idx="${idx}">
+      <button class="btn btn-del btn-danger" aria-label="移除原料" data-action="removeIngredient" data-idx="${idx}" data-cat="${cat}">✕</button>
     </div>`;
   }).join('');
 }
@@ -1229,6 +1434,7 @@ function editMaterialPrice(type, matId) {
   showPrompt(`修改 [${mat.name}] 的价格`, mat.price, (val) => {
     const price = parseInt(val);
     if (isNaN(price) || price <= 0) { toast('请输入有效价格','error'); return false; }
+    if (type === 'system') warnPriceJump('system', matId, price, mat.name);
     mat.price = price;
     if (type === 'player') recordPrice('mat', matId, price);
     saveData();
@@ -1373,7 +1579,7 @@ function editProduct(prodId) {
       const matName = mat ? mat.name : '(已删除)';
       return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.78rem;">
         <span style="flex:1;">${esc(matName)} ×${ing.quantity}</span>
-        <button class="btn btn-del btn-danger" aria-label="移除原料" onclick="editIngs_remove(${idx})">✕</button>
+        <button class="btn btn-del btn-danger" aria-label="移除原料" data-action="editIngsRemove" data-idx="${idx}">✕</button>
       </div>`;
     }).join('') + `<div style="display:flex;gap:4px;margin-top:4px;" id="epAddIngRow">
       <select id="epIngSel" style="flex:2;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:0.75rem;border-radius:3px;">
@@ -1381,7 +1587,7 @@ function editProduct(prodId) {
         ${mats.map(m => `<option value="${m.id}" data-type="${m.type}">[${m.typeLabel}] ${esc(m.name)} (${fmtGold(m.price)}G)</option>`).join('')}
       </select>
       <input type="number" id="epIngQty" value="1" min="1" style="width:50px;padding:3px 5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:0.75rem;border-radius:3px;">
-      <button class="btn btn-xs btn-primary" style="padding:3px 8px;" onclick="editIngs_add()">添加</button>
+      <button class="btn btn-xs btn-primary" style="padding:3px 8px;" data-action="editIngsAdd">添加</button>
     </div>`;
   }
   
@@ -1408,7 +1614,7 @@ function editProduct(prodId) {
     <label>原料配方</label>
     <div id="epIngList" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:6px 8px;"></div>
     <div class="modal-actions">
-      <button class="btn btn-sm" onclick="closeModal()">取消</button>
+      <button class="btn btn-sm" data-action="closeModal">取消</button>
       <button class="btn btn-primary btn-sm" id="epSaveBtn">保存</button>
     </div>
   </div>`;
@@ -1444,7 +1650,7 @@ function showPrompt(title, defaultValue, onConfirm) {
     <h3>${esc(title)}</h3>
     <input type="number" id="pmInput" value="${defaultValue}" min="0" step="1" style="font-size:1.2rem;text-align:center;">
     <div class="modal-actions">
-      <button class="btn btn-sm" onclick="closeModal()">取消</button>
+      <button class="btn btn-sm" data-action="closeModal">取消</button>
       <button class="btn btn-primary btn-sm" id="pmOkBtn">确认</button>
     </div>
   </div>`;
@@ -1460,14 +1666,34 @@ function showPrompt(title, defaultValue, onConfirm) {
 }
 
 let modalEscHandlers = [];
+let modalTabHandlers = [];
+function bindModalFocusTrap() {
+  const h = function(e) {
+    if (e.key !== 'Tab') return;
+    const masks = document.querySelectorAll('.modal-mask');
+    if (!masks.length) return;
+    const mask = masks[masks.length - 1];
+    const focusables = Array.from(mask.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+      .filter(function(el) { return !el.disabled && el.offsetParent !== null; });
+    if (!focusables.length) return;
+    const first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  modalTabHandlers.push(h);
+  document.addEventListener('keydown', h);
+}
 function bindEscClose() {
   const h = function(e) { if (e.key === 'Escape') closeModal(); };
   modalEscHandlers.push(h);
   document.addEventListener('keydown', h);
+  bindModalFocusTrap();
 }
 function closeModal() {
   modalEscHandlers.forEach(function(h) { document.removeEventListener('keydown', h); });
   modalEscHandlers = [];
+  modalTabHandlers.forEach(function(h) { document.removeEventListener('keydown', h); });
+  modalTabHandlers = [];
   document.querySelectorAll('.modal-mask').forEach(function(m) { m.remove(); });
   // Clean up per-modal globals installed by editProduct
   window.editIngs_remove = null;
@@ -1539,6 +1765,7 @@ function normalizeImportedData(imp) {
   if (!Array.isArray(imp.systemMaterials) || !Array.isArray(imp.playerMaterials) || !Array.isArray(imp.products)) throw new Error('格式不正确');
 
   const clean = {
+    schemaVersion: DATA_VERSION,
     systemMaterials: dedupeById(imp.systemMaterials.map(m => {
       const name = String((m && m.name) || '').trim().slice(0, 100);
       if (!name) return null;
@@ -1619,6 +1846,7 @@ function resetAll() {
   if (!confirm('确定清空所有数据吗？建议先导出备份。')) return;
   data = {
     systemMaterials: [], playerMaterials: [], products: [],
+    schemaVersion: DATA_VERSION,
     priceHistory: {}, freightPresets: [], treasurePrice: 0,
     kunPrice: 0, kunRate: 97.5,
     lastUpdatedBy: '', lastUpdatedAt: ''
@@ -1630,6 +1858,29 @@ function resetAll() {
 }
 
 // ==================== PRICE HISTORY ====================
+// 数据质量校验：首次价格作为基线，之后按最新一次价格检查异常跳变；只提示，不拦截。
+function warnPriceJump(type, id, price, name) {
+  try {
+    const key = type + '_' + id;
+    const BL_KEY = 'mmo_price_baselines';
+    let baselines = {};
+    try { baselines = JSON.parse(localStorage.getItem(BL_KEY) || '{}') || {}; } catch(e) {}
+    if (!baselines[key]) {
+      baselines[key] = price;
+      localStorage.setItem(BL_KEY, JSON.stringify(baselines));
+      return;
+    }
+    const base = baselines[key];
+    const hist = (data.priceHistory || {})[key] || [];
+    const last = hist.length ? hist[hist.length - 1].price : base;
+    const ratio = price / last;
+    if (ratio >= 5 || ratio <= 0.2) {
+      const label = name || '该价格';
+      const pct = ratio >= 5 ? '+' + Math.round((ratio - 1) * 100) + '%' : '-' + Math.round((1 - ratio) * 100) + '%';
+      toast(`⚠️ 疑似录错：${label} ${fmtGold(last)} → ${fmtGold(price)}（${pct}），已保存，请确认`, 'error');
+    }
+  } catch(e) {}
+}
 function recordPrice(type, id, price) {
   if (!data.priceHistory) data.priceHistory = {};
   const key = type + '_' + id;
@@ -1637,6 +1888,11 @@ function recordPrice(type, id, price) {
   // Skip duplicate consecutive entries with same price
   const last = data.priceHistory[key][data.priceHistory[key].length - 1];
   if (last && last.price === price) return;
+  let name = '';
+  if (type === 'mat') { const m = data.playerMaterials.find(x => x.id === id); name = m ? m.name : ''; }
+  else if (type === 'prod') { const p = data.products.find(x => x.id === id); name = p ? p.name : ''; }
+  else if (type === 'treasure') name = '宝图残片';
+  warnPriceJump(type, id, price, name);
   data.priceHistory[key].push({ date: new Date().toISOString(), price: price });
   if (data.priceHistory[key].length > 200) data.priceHistory[key] = data.priceHistory[key].slice(-200);
 }
@@ -1848,6 +2104,8 @@ function toast(msg, type) {
   if (exist) exist.remove();
   const t = document.createElement('div');
   t.className = 'toast toast-' + (type || 'success');
+  t.setAttribute('role', 'status');
+  t.setAttribute('aria-live', 'polite');
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2000);
@@ -1874,6 +2132,26 @@ let pessimisticRate = 90;
 let kunPrice = 0;
 let kunRate = 97.5;     // synced
 let customOppCost = 0;  // local only: 0 = 自动计算
+let normalTasks = [];   // local only: 每人刷到的普通货运任务不同
+let normalExcludes = []; // local only: 普通货运排除商品
+const DEFAULT_NORMAL_EXCLUDES = [
+  '百炼武器鉴定书','百炼头盔鉴定书','百炼戒指鉴定书','百炼手套鉴定书',
+  '百炼耳饰鉴定书','百炼腰带鉴定书','百炼项链鉴定书','百炼上衣鉴定书',
+  '百炼手镯鉴定书','百炼鞋子鉴定书',
+  '山河灵玉','神器秘印','稀世残符'
+];
+const NORMAL_TIERS = [[5,20000,108],[6,24000,126],[7,28000,144],[8,32000,162]];
+// 目标站示例任务（首次使用且产物库有对应名称时自动载入，之后由用户自行增删）
+const NORMAL_SEED = [
+  ['下品东坡肘子',2,18],
+  ['下品东坡肘子',1,9],
+  ['下品碎金饭',1,9],
+  ['下品松鼠鲤鱼',1,9],
+  ['下品白斩鸡',2,18],
+  ['下品金玉饭',1,9],
+  ['下品灯影牛肉',1,18],
+  ['下品珠玑羹',1,9]
+];
 
 function updateTreasureModInfo() {
   var ph = (data.priceHistory||{})["treasure_treasure"];
@@ -1908,7 +2186,41 @@ function loadFreightData() {
   updateTreasureModInfo();
   // Load local slots
   try { const s = localStorage.getItem('freight_slots'); if (s) freightSlots = JSON.parse(s); } catch(e) {}
+  // Load local ordinary tasks; first time auto-seed from example if products exist
+  const normalRaw = localStorage.getItem('mmo_normal_freight_tasks');
+  try { if (normalRaw) normalTasks = JSON.parse(normalRaw); else normalTasks = []; } catch(e) { normalTasks = []; }
+  // 普通货运排除商品（本地）
+  const excRaw = localStorage.getItem('mmo_normal_freight_excludes');
+  try { normalExcludes = excRaw ? JSON.parse(excRaw) : [...DEFAULT_NORMAL_EXCLUDES]; } catch(e) { normalExcludes = [...DEFAULT_NORMAL_EXCLUDES]; }
+  const excludeInput = document.getElementById('normalExcludeInput');
+  if (excludeInput) excludeInput.value = normalExcludes.join('\n');
+  // 默认排除设置生效后，自动清理已包含被排除商品的旧任务
+  if (normalTasks.length) {
+    const beforeCount = normalTasks.length;
+    normalTasks = normalTasks.filter(t => {
+      const p = data.products.find(x => x.id === t.productId);
+      return !!p && !isProductExcluded(p);
+    });
+    if (normalTasks.length !== beforeCount) saveNormalTasks();
+  }
   renderFreight();
+}
+
+function seedNormalTasksIfEmpty() {
+  if (normalTasks.length > 0 || data.products.length === 0) return false;
+  const byName = {};
+  data.products.forEach(p => { byName[p.name] = p; });
+  const seeded = [];
+  NORMAL_SEED.forEach(([name, qty, reward]) => {
+    const p = byName[name];
+    if (p && !isProductExcluded(p)) seeded.push({ id: genId(), productId: p.id, qty, reward });
+  });
+  if (seeded.length > 0) {
+    normalTasks = seeded;
+    saveNormalTasks();
+    return true;
+  }
+  return false;
 }
 
 function savePessimisticRate() {
@@ -1942,6 +2254,132 @@ function saveCustomOppCost() {
   }
 }
 
+// ==================== NORMAL FREIGHT (普通货运) ====================
+function switchFreightTab(tab) {
+  document.getElementById('normalFreightPanel').style.display = tab === 'normal' ? 'block' : 'none';
+  document.getElementById('advFreightPanel').style.display = tab === 'adv' ? 'block' : 'none';
+  document.getElementById('tabNormal').classList.toggle('active', tab === 'normal');
+  document.getElementById('tabAdv').classList.toggle('active', tab === 'adv');
+  document.getElementById('advFreightControls').style.display = tab === 'adv' ? '' : 'none';
+}
+function saveNormalTasks() { localStorage.setItem('mmo_normal_freight_tasks', JSON.stringify(normalTasks)); }
+function isProductExcluded(p) {
+  return !!(p && normalExcludes.includes(p.name));
+}
+function getNormalProducts() {
+  return data.products.filter(p => !isProductExcluded(p));
+}
+function renderNormalTasks() {
+  seedNormalTasksIfEmpty();
+  const ct = document.getElementById('normalTaskList');
+  if (!ct) return;
+  const prods = getNormalProducts();
+  if (!prods.length) {
+    ct.innerHTML = '<div class="empty-state"><p>没有可用于普通货运的商品（可在下方排除设置中调整）</p></div>';
+    return;
+  }
+  if (!normalTasks.length) {
+    ct.innerHTML = '<div class="empty-state"><p>暂无普通货运任务，点击下方「+ 添加任务」（最多 8 个）</p></div>';
+    return;
+  }
+  ct.innerHTML = normalTasks.map((t, idx) => {
+    const all = prods.map(p => `<option value="${p.id}"${p.id === t.productId ? ' selected' : ''}>${esc(p.name)} (${fmtGold(p.sellPrice)}G)</option>`).join('');
+    return `<div class="normal-task-row">
+      <span class="reward-label">任务${idx + 1}</span>
+      <select data-change="normalField" data-idx="${idx}" data-field="productId">${all}</select>
+      <input type="number" value="${t.qty}" min="1" data-change="normalField" data-idx="${idx}" data-field="qty">
+      <span class="reward-label">→</span>
+      <input type="number" value="${t.reward}" min="1" data-change="normalField" data-idx="${idx}" data-field="reward">
+      <span class="reward-label">帮贡</span>
+      <button class="btn btn-del btn-danger" data-action="deleteNormalTask" data-idx="${idx}" title="删除任务" aria-label="删除任务">✕</button>
+    </div>`;
+  }).join('');
+}
+function normalTaskField(idx, field, val) {
+  if (!normalTasks[idx]) return;
+  if (field === 'productId') normalTasks[idx].productId = val;
+  else if (field === 'qty') normalTasks[idx].qty = Math.max(1, parseInt(val) || 1);
+  else if (field === 'reward') normalTasks[idx].reward = Math.max(1, parseInt(val) || 1);
+  saveNormalTasks();
+}
+function addNormalTask() {
+  if (normalTasks.length >= 8) { toast('普通货运最多 8 个任务（每周刷新 8 个）','error'); return; }
+  const prods = getNormalProducts();
+  if (!prods.length) { toast('没有可用于普通货运的商品（可能被排除设置过滤了）','error'); return; }
+  normalTasks.push({ id: genId(), productId: prods[0].id, qty: 1, reward: 9 });
+  saveNormalTasks();
+  renderNormalTasks();
+}
+function deleteNormalTask(idx) {
+  normalTasks.splice(idx, 1);
+  saveNormalTasks();
+  renderNormalTasks();
+}
+function saveNormalExcludes() {
+  const raw = document.getElementById('normalExcludeInput').value || '';
+  const parts = raw.split(/[\n,，、]+/).map(s => s.trim()).filter(Boolean);
+  normalExcludes = [...new Set(parts)];
+  localStorage.setItem('mmo_normal_freight_excludes', JSON.stringify(normalExcludes));
+  const removed = normalTasks.filter(t => {
+    const p = data.products.find(x => x.id === t.productId);
+    return !p || isProductExcluded(p);
+  });
+  if (removed.length) {
+    normalTasks = normalTasks.filter(t => {
+      const p = data.products.find(x => x.id === t.productId);
+      return !!p && !isProductExcluded(p);
+    });
+    saveNormalTasks();
+    toast('已按排除设置移除 ' + removed.length + ' 个任务');
+  } else {
+    toast('排除设置已保存');
+  }
+  renderNormalTasks();
+}
+function calcNormalFreight() {
+  const body = document.getElementById('normalFreightBody');
+  const thead = document.getElementById('normalFreightThead');
+  if (!body || !thead) return;
+  if (!normalTasks.length) { toast('请先添加普通货运任务','error'); return; }
+  const items = [];
+  normalTasks.forEach((t, i) => {
+    const p = data.products.find(x => x.id === t.productId);
+    if (!p) return;
+    const qty = t.qty || 1, reward = t.reward || 0;
+    const cost = (p.sellPrice || 0) * qty;
+    if (cost <= 0 || reward <= 0) return;
+    items.push({ idx: i, matName: p.name, qty, reward, cost, price: p.sellPrice, eff: reward / cost });
+  });
+  if (!items.length) { toast('任务缺少有效商品/价格/奖励','error'); return; }
+  items.sort((a,b) => b.eff - a.eff);
+  const tiers = {};
+  NORMAL_TIERS.forEach(t => tiers[t[0]] = t);
+  thead.innerHTML = '<tr><th>提交数</th><th>最优推荐</th><th>材料清单</th><th>总成本</th><th>帮贡合计</th><th>额外奖励</th><th>每6点帮贡成本</th></tr>';
+  const rowData = [];
+  for (let n = 1; n <= Math.min(items.length, 8); n++) {
+    const pick = items.slice(0, n);
+    let cost = 0, rew = 0;
+    const mats = {};
+    pick.forEach(it => {
+      cost += it.cost;
+      rew += it.reward;
+      mats[it.matName] = (mats[it.matName] || 0) + it.qty;
+    });
+    let bonus = '—';
+    if (tiers[n]) {
+      rew += tiers[n][2];
+      bonus = '+' + tiers[n][1].toLocaleString('zh-CN') + ' 交子 +' + tiers[n][2] + ' 帮贡';
+    }
+    const numList = pick.map(it => it.idx + 1).sort((a,b) => a-b).join('、');
+    const ml = Object.keys(mats).map(k => k + '×' + mats[k]).join('、');
+    const per6 = rew > 0 ? Math.round(cost * 6 / rew) : null;
+    const per6Cls = per6 != null && per6 < 500 ? ' style="color:var(--gold);font-weight:700;"' : '';
+    rowData.push({ per6, html: `<tr><td><b>提交 ${n}</b></td><td>任务 ${numList}</td><td style="font-size:0.72rem;">${esc(ml)}</td><td>${fmtGold(cost)} 铜</td><td>${fmtGold(rew)} 帮贡</td><td>${bonus}</td><td><span${per6Cls}>${per6 == null ? '—' : fmtGold(per6) + ' 铜'}</span></td></tr>` });
+  }
+  body.innerHTML = rowData.map(r => r.html).join('');
+  toast('普通货运计算完成；每6点帮贡成本 <500 已金色高亮');
+}
+
 function saveTreasurePrice() {
   treasurePrice = parseInt(document.getElementById('treasurePrice').value) || 0;
   data.treasurePrice = treasurePrice;
@@ -1961,10 +2399,10 @@ function renderFreightGrid() {
     if (slot) {
       const p = data.products.find(x => x.id === slot.productId);
       const name = p ? p.name : '(已删除)';
-      return '<div class="freight-slot filled calculated" title="点击清除" onclick="clearFreightSlot(' + idx + ')"><span class="slot-num">' + (slot.order||'') + '</span><span class="slot-name">' + esc(name) + ' ×' + slot.qty + ' → ' + (slot.rewardQty||3) + '残片</span><span class="slot-clear" title="清除槽位" aria-label="清除槽位" onclick="event.stopPropagation();clearFreightSlot(' + idx + ')">✕</span></div>';
+      return '<div class="freight-slot filled calculated" title="点击清除" data-action="clearFreightSlot" data-idx="' + idx + '"><span class="slot-num">' + (slot.order||'') + '</span><span class="slot-name">' + esc(name) + ' ×' + slot.qty + ' → ' + (slot.rewardQty||3) + '残片</span><span class="slot-clear" title="清除槽位" aria-label="清除槽位" data-action="clearFreightSlot" data-idx="' + idx + '">✕</span></div>';
     }
     const picking = pickTargetSlot === idx ? ' picking' : '';
-    return '<div class="freight-slot' + picking + '" onclick="pickPresetForSlot(' + idx + ')"><span style="color:var(--text-dim);font-size:0.7rem;">' + (picking ? '👈 点击下方方案填入' : '+ 点击/拖入方案') + '</span></div>';
+    return '<div class="freight-slot' + picking + '" data-action="pickPresetForSlot" data-idx="' + idx + '"><span style="color:var(--text-dim);font-size:0.7rem;">' + (picking ? '👈 点击下方方案填入' : '+ 点击/拖入方案') + '</span></div>';
   }).join('');
 }
 
@@ -1980,13 +2418,14 @@ function renderPresetList() {
   ct.innerHTML = sorted.map(pr => {
     const p = data.products.find(x => x.id === pr.productId);
     const pname = p ? p.name : '(已删除)';
-    return '<div class="preset-item" draggable="true" onclick="addToSlot(' + freightPresets.indexOf(pr) + ')"><span class="preset-name">' + esc(pr.name) + '</span><span class="preset-info">' + esc(pname) + ' ×' + pr.qty + ' → ' + (pr.rewardQty||3) + '残片</span><button class="btn btn-del btn-danger" aria-label="删除方案" onclick="event.stopPropagation();deleteFreightPreset(' + freightPresets.indexOf(pr) + ')">✕</button></div>';
+    return '<div class="preset-item" draggable="true" data-action="addToSlot" data-idx="' + freightPresets.indexOf(pr) + '"><span class="preset-name">' + esc(pr.name) + '</span><span class="preset-info">' + esc(pname) + ' ×' + pr.qty + ' → ' + (pr.rewardQty||3) + '残片</span><button class="btn btn-del btn-danger" aria-label="删除方案" data-action="deleteFreightPreset" data-idx="' + freightPresets.indexOf(pr) + '">✕</button></div>';
   }).join('');
 }
 
 function renderFreight() {
   renderFreightGrid();
   renderPresetList();
+  renderNormalTasks();
 }
 
 // Initialize drag-drop once on the freight card
@@ -2081,7 +2520,7 @@ function addFreightPreset() {
     prods.map((p,i) => '<option value="'+i+'">'+esc(p.name)+'</option>').join('') + '</select>' +
     '<label>提交数量（n）</label><input type="number" id="fpQty" value="1" min="1">' +
     '<label>获得残片数（m）</label><input type="number" id="fpReward" value="3" min="1">' +
-    '<div class="modal-actions"><button class="btn btn-sm" onclick="closeModal()">取消</button><button class="btn btn-primary btn-sm" id="fpSave">确认</button></div></div>';
+    '<div class="modal-actions"><button class="btn btn-sm" data-action="closeModal">取消</button><button class="btn btn-primary btn-sm" id="fpSave">确认</button></div></div>';
   document.body.appendChild(m);
   document.getElementById('fpQty').focus();
   document.getElementById('fpSave').onclick = function() {
