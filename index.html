@@ -768,6 +768,7 @@ const STORAGE_KEY = 'mmo_craft_cloud_v1';
 const DATA_VERSION = 2; // 数据结构版本，用于自动迁移/兼容
 const SUPABASE_URL = 'https://voreyobicculgcfudfae.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_AijTqALCInLK0Ip6bokqgA__wSHIlle';
+const SUPABASE_REST = SUPABASE_URL + '/rest/v1';
 
 let nickname = localStorage.getItem('nickname') || '';
 function setNickname() {
@@ -791,8 +792,9 @@ function updateLastUpdate() {
     el.style.display = 'block';
   }
 }
-let sbClient = null;
 let cloudEnabled = false;
+let cloudSyncing = false;
+let cloudPollTimer = null;
 
 function setCloudStatus(txt, cls) {
   const el = document.getElementById('cloudStatus');
@@ -801,28 +803,22 @@ function setCloudStatus(txt, cls) {
   el.className = 'cloud-status' + (cls ? ' ' + cls : '');
 }
 
-// Lazy-load Supabase SDK on first cloud attempt (keeps initial page parse fast)
-let sbLoadPromise = null;
-function loadSupabaseJs() {
-  if (window.supabase && window.supabase.createClient) return Promise.resolve(window.supabase);
-  if (sbLoadPromise) return sbLoadPromise;
-  sbLoadPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-    s.integrity = 'sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC';
-    s.crossOrigin = 'anonymous';
-    s.onload = () => (window.supabase && window.supabase.createClient) ? resolve(window.supabase) : reject(new Error('Supabase SDK 加载异常'));
-    s.onerror = () => { sbLoadPromise = null; reject(new Error('Supabase SDK 网络加载失败')); };
-    document.head.appendChild(s);
-  });
-  return sbLoadPromise;
+// Supabase REST 直连：不再依赖 CDN 加载 Supabase SDK，
+// 避免 jsdelivr 等 CDN 被网络阻断时云端功能整体不可用。
+function supabaseHeaders() {
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json'
+  };
 }
 
 async function initCloud() {
   setCloudStatus('☁️ 连接中…', '');
   try {
-    const sb = await loadSupabaseJs();
-    sbClient = sb.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 探测 Supabase REST API 是否可达（表有数据或空数组都算可达）
+    const r = await fetch(SUPABASE_REST + '/game_data?select=id&limit=1', { headers: supabaseHeaders() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     cloudEnabled = true;
     setCloudStatus('☁️ 云端已连接', 'ok');
     return true;
@@ -835,11 +831,15 @@ async function initCloud() {
 }
 
 async function cloudLoad() {
-  if (!cloudEnabled || !sbClient) return null;
+  if (!cloudEnabled) return null;
   try {
-    const { data } = await sbClient.from('game_data').select('data').eq('id', 'v2').single();
-    if (data) return data.data;
-  } catch(e) {}
+    const r = await fetch(SUPABASE_REST + '/game_data?select=data&id=eq.v2', { headers: supabaseHeaders() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (Array.isArray(rows) && rows.length && rows[0].data) return rows[0].data;
+  } catch(e) {
+    console.warn('[cloud] 加载失败：', e);
+  }
   return null;
 }
 
@@ -870,16 +870,24 @@ function applyCloudData(d) {
 }
 
 async function cloudSave(d) {
-  if (!cloudEnabled || !sbClient) return;
+  if (!cloudEnabled) return;
   setCloudStatus('☁️ 同步中…', '');
+  cloudSyncing = true;
   try {
     var uploadData = JSON.parse(JSON.stringify(d));
     uploadData.products.forEach(function(p) { delete p.doubleChance; });
-    await sbClient.from('game_data').upsert({ id: 'v2', data: uploadData, updated_at: new Date().toISOString() });
+    const r = await fetch(SUPABASE_REST + '/game_data', {
+      method: 'POST',
+      headers: Object.assign(supabaseHeaders(), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ id: 'v2', data: uploadData, updated_at: new Date().toISOString() })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     setCloudStatus('☁️ 已同步', 'ok');
   } catch(e) {
     console.warn('[cloud] 保存失败：', e);
     setCloudStatus('⚠️ 同步失败', 'err');
+  } finally {
+    cloudSyncing = false;
   }
 }
 
@@ -906,12 +914,15 @@ function flushCloudSave() {
 }
 window.addEventListener('pagehide', flushCloudSave);
 
+// 用轮询替代 Supabase Realtime（同样不依赖 SDK/CDN）：
+// 本地有未上传改动或正在上传时跳过，避免旧云端数据覆盖本地新编辑。
 function cloudListen() {
-  if (!cloudEnabled || !sbClient) return;
-  sbClient.channel('data_changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'game_data' }, () => {
-      cloudLoad().then(d => { if (d && applyCloudData(d)) toast('📡 数据已从云端更新', 'success'); });
-    }).subscribe();
+  if (!cloudEnabled) return;
+  if (cloudPollTimer) return;
+  cloudPollTimer = setInterval(function() {
+    if (cloudSyncing || cloudSavePending) return;
+    cloudLoad().then(d => { if (d && applyCloudData(d)) toast('📡 数据已从云端更新', 'success'); });
+  }, 20000);
 }
 const SORT_FIELDS = ['name','sellPrice','afterTax','cost','profit','profitRate','expectedProfit','expectedProfitRate','staminaProfit','staminaExpectedProfit','staminaExpectedLow'];
 
@@ -1951,20 +1962,34 @@ function onTrendCatChange() {
 }
 
 // Lazy-load Chart.js only when a trend item is actually selected
-const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+// 多 CDN 回退：jsdelivr 被网络阻断时依次尝试 unpkg / cdnjs
+const CHART_JS_URLS = [
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js',
+  'https://unpkg.com/chart.js@4.4.7/dist/chart.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.min.js'
+];
 const CHART_JS_INTEGRITY = 'sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC';
 let chartJsPromise = null;
 function ensureChartJs() {
   if (window.Chart) return Promise.resolve();
   if (chartJsPromise) return chartJsPromise;
   chartJsPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = CHART_JS_URL;
-    s.integrity = CHART_JS_INTEGRITY;
-    s.crossOrigin = 'anonymous';
-    s.onload = () => window.Chart ? resolve() : reject(new Error('Chart.js 加载异常'));
-    s.onerror = () => { chartJsPromise = null; reject(new Error('Chart.js 网络加载失败')); };
-    document.head.appendChild(s);
+    let idx = 0;
+    function tryNext() {
+      if (idx >= CHART_JS_URLS.length) {
+        chartJsPromise = null;
+        reject(new Error('Chart.js 网络加载失败'));
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = CHART_JS_URLS[idx++];
+      s.integrity = CHART_JS_INTEGRITY;
+      s.crossOrigin = 'anonymous';
+      s.onload = () => { if (window.Chart) { resolve(); } else { s.remove(); tryNext(); } };
+      s.onerror = () => { s.remove(); tryNext(); };
+      document.head.appendChild(s);
+    }
+    tryNext();
   });
   return chartJsPromise;
 }
@@ -2817,7 +2842,7 @@ loadFreightData();
 initFreightDrag();
 initDragDrop();
 if (nickname) document.getElementById("nickDisplay").textContent = "\u{1F464} " + nickname;
-// 后台尝试云端连接（SDK 懒加载，不影响首屏渲染）
+// 后台尝试云端连接（REST 直连探测，不影响首屏渲染）
 initCloud().then(ok => {
   if (!ok) return;
   cloudListen();
@@ -2826,7 +2851,11 @@ initCloud().then(ok => {
   });
   // 记录访问日志
   fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{
-    sbClient.from('visits').insert({ip:d.ip, user_agent:navigator.userAgent}).then(()=>{});
+    fetch(SUPABASE_REST + '/visits', {
+      method: 'POST',
+      headers: Object.assign(supabaseHeaders(), { 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ ip: d.ip, user_agent: navigator.userAgent })
+    }).then(()=>{});
   }).catch(()=>{});
 });
 </script>
