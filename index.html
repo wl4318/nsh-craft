@@ -2336,10 +2336,10 @@
             pickPresetForSlot(parseInt(el.getAttribute("data-idx"), 10));
             break;
           case "addToSlot":
-            addToSlot(parseInt(el.getAttribute("data-idx"), 10));
+            addToSlot(el.getAttribute("data-pid"));
             break;
           case "deleteFreightPreset":
-            deleteFreightPreset(parseInt(el.getAttribute("data-idx"), 10));
+            deleteFreightPreset(el.getAttribute("data-pid"));
             break;
           case "deleteNormalTask":
             deleteNormalTask(parseInt(el.getAttribute("data-idx"), 10));
@@ -4084,6 +4084,25 @@
       }
       function loadFreightData() {
         if (data.freightPresets) freightPresets = data.freightPresets;
+        // 补全缺失的预设 id：预设列表按名称排序展示，DOM 顺序 ≠ 数组顺序，
+        // 因此槽位/删除必须用稳定 id 关联，不能再用数组下标（下标已导致串位）。
+        let patched = false;
+        const seenPresetIds = {};
+        freightPresets.forEach(function (pr) {
+          if (!pr || typeof pr !== "object") return;
+          var pid = pr.id;
+          if (typeof pid !== "string" || !SAFE_ID_RE.test(pid) || seenPresetIds[pid]) {
+            pr.id = genId();
+            patched = true;
+          }
+          seenPresetIds[pr.id] = true;
+        });
+        if (patched) {
+          data.freightPresets = freightPresets;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          } catch (e) {}
+        }
         treasurePrice = Number(data.treasurePrice) || 0;
         // 悲观比例：个人设置，仅本地保存，不参与云同步
         pessimisticRate =
@@ -4445,6 +4464,17 @@
           .join("");
       }
 
+      // 通过稳定 id 定位预设：列表展示顺序（按名称排序）与数组顺序无关，
+      // 早期版本用 indexOf 下标关联，导致「拖/点 A 方案填进槽位却显示成 B」。
+      function findPresetById(pid) {
+        if (pid == null) return null;
+        return (
+          freightPresets.find(function (pr) {
+            return pr && pr.id === pid;
+          }) || null
+        );
+      }
+
       function renderPresetList() {
         const ct = document.getElementById("presetList");
         if (!ct) return;
@@ -4461,9 +4491,10 @@
           .map((pr) => {
             const p = data.products.find((x) => x.id === pr.productId);
             const pname = p ? p.name : "(已删除)";
+            const pid = esc(pr.id);
             return (
-              '<div class="preset-item" draggable="true" data-action="addToSlot" data-idx="' +
-              freightPresets.indexOf(pr) +
+              '<div class="preset-item" draggable="true" data-action="addToSlot" data-pid="' +
+              pid +
               '"><span class="preset-name">' +
               esc(pr.name) +
               '</span><span class="preset-info">' +
@@ -4472,8 +4503,8 @@
               pr.qty +
               " → " +
               (pr.rewardQty || 3) +
-              '残片</span><button class="btn btn-del btn-danger" aria-label="删除方案" data-action="deleteFreightPreset" data-idx="' +
-              freightPresets.indexOf(pr) +
+              '残片</span><button class="btn btn-del btn-danger" aria-label="删除方案" data-action="deleteFreightPreset" data-pid="' +
+              pid +
               '">✕</button></div>'
             );
           })
@@ -4493,9 +4524,9 @@
         card.addEventListener("dragstart", function (e) {
           var el = e.target.closest(".preset-item");
           if (!el) return;
-          var presets = Array.from(card.querySelectorAll(".preset-item"));
-          var idx = presets.indexOf(el);
-          if (idx >= 0) e.dataTransfer.setData("presetIdx", idx);
+          // 直接用元素携带的稳定 id，绝不再用 DOM 序号换算数组下标
+          e.dataTransfer.setData("presetId", el.getAttribute("data-pid") || "");
+          e.dataTransfer.effectAllowed = "copy";
         });
         card.addEventListener("dragover", function (e) {
           var slot = e.target.closest(".freight-slot");
@@ -4516,9 +4547,8 @@
           var slots = Array.from(card.querySelectorAll(".freight-slot"));
           var i = slots.indexOf(slot);
           if (i < 0) return;
-          var pi = parseInt(e.dataTransfer.getData("presetIdx"));
-          if (!isNaN(pi) && pi >= 0 && freightPresets[pi]) {
-            var pr = freightPresets[pi];
+          var pr = findPresetById(e.dataTransfer.getData("presetId"));
+          if (pr) {
             freightSlots[i] = {
               productId: pr.productId,
               qty: pr.qty,
@@ -4527,6 +4557,9 @@
             };
             saveFreightSlots();
             renderFreightGrid();
+            toast(`已把「${pr.name}」填入槽位 ${i + 1}`);
+          } else {
+            toast("方案已不存在，请刷新方案库", "error");
           }
         });
       }
@@ -4543,12 +4576,12 @@
         if (pickTargetSlot >= 0)
           toast("已选中槽位 " + (idx + 1) + "，请点击下方预设方案");
       }
-      function addToSlot(presetIdx) {
+      function addToSlot(presetId) {
         if (pickTargetSlot < 0) {
           toast("请先点击一个空槽位", "error");
           return;
         }
-        const pr = freightPresets[presetIdx];
+        const pr = findPresetById(presetId);
         if (!pr) return;
         const slotIdx = pickTargetSlot;
         freightSlots[slotIdx] = {
@@ -4652,11 +4685,16 @@
         bindEscClose();
       }
 
-      function deleteFreightPreset(idx) {
-        freightPresets.splice(idx, 1);
+      function deleteFreightPreset(presetId) {
+        const i = freightPresets.findIndex(function (pr) {
+          return pr && pr.id === presetId;
+        });
+        if (i < 0) return;
+        const removed = freightPresets.splice(i, 1)[0];
         data.freightPresets = freightPresets;
         saveData();
         renderPresetList();
+        toast(`已删除方案「${removed.name}」`);
       }
 
       function calcFreight() {
