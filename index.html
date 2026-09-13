@@ -1873,12 +1873,12 @@
       const SUPABASE_KEY = "sb_publishable_AijTqALCInLK0Ip6bokqgA__wSHIlle";
       const SUPABASE_REST = SUPABASE_URL + "/rest/v1";
 
-      let nickname = localStorage.getItem("nickname") || "";
+      let nickname = lsGet("nickname") || "";
       function setNickname() {
         var n = prompt("设置你的昵称（群友能看到谁更新了数据）：", nickname);
         if (n !== null && n.trim()) {
           nickname = n.trim();
-          localStorage.setItem("nickname", nickname);
+          lsSet("nickname", nickname);
           document.getElementById("nickDisplay").textContent = "👤 " + nickname;
         }
       }
@@ -1967,24 +1967,27 @@
           // 恢复本地 doubleChance（不从云端覆盖）
           try {
             var dc = JSON.parse(
-              localStorage.getItem("mmo_doubleChance") || "{}",
+              lsGet("mmo_doubleChance") || "{}",
             );
             cleaned.products.forEach(function (p) {
               if (dc[p.id] !== undefined) p.doubleChance = dc[p.id];
             });
           } catch (e) {}
-          // 云端数据与本地缓存一致时跳过重渲染，避免刷新时列表先按本地旧顺序
-          // 绘制、再被云端数据重新绘制造成的闪动
+          // data 与本地缓存一致时跳过「材料/产物表」的重绘，避免刷新时列表先按本地
+          // 旧顺序绘制、再被云端数据重新绘制造成的闪动。但货运状态（预设库/槽位/
+          // 普通任务）与 data 是两套变量，必须无条件同步，否则界面会停在旧内容上，
+          // 只能靠手动刷新才对齐。
           const changed = JSON.stringify(data) !== JSON.stringify(cleaned);
           data = cleaned;
           if (changed) {
             // 回写本地缓存：下次刷新首屏就是云端最新顺序
             try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+              lsSet(STORAGE_KEY, JSON.stringify(data));
             } catch (e) {}
-            loadFreightData();
-            renderAll();
           }
+          // loadFreightData 内部已按需渲染货运区，此处不必再调 renderFreight
+          loadFreightData();
+          if (changed) renderAll();
           return true;
         } catch (e) {
           console.warn("[cloud] 云端数据格式异常：", e);
@@ -2025,7 +2028,11 @@
       // Debounced cloud save: merge bursts of edits into one upsert, preserving order.
       let cloudSaveTimer = null;
       let cloudSavePending = null;
+      // 本地编辑代号：每次保存自增。applyCloudData 据此判断
+      // 「云端数据是不是在本地这次编辑之前就取回来的」，避免用旧快照覆盖新编辑。
+      let localEditSeq = 0;
       function cloudSaveDebounced(d) {
+        localEditSeq++;
         cloudSavePending = d;
         if (cloudSaveTimer) return;
         cloudSaveTimer = setTimeout(function () {
@@ -2055,8 +2062,18 @@
         if (cloudPollTimer) return;
         cloudPollTimer = setInterval(function () {
           if (cloudSyncing || cloudSavePending) return;
+          // 记录请求发起时的本地编辑代号：请求在途期间若发生本地编辑，
+          // 回来的旧云端快照必须丢弃，否则会把新编辑覆盖掉。
+          const seqAtRequest = localEditSeq;
           cloudLoad().then((d) => {
-            if (d && applyCloudData(d)) toast("📡 数据已从云端更新", "success");
+            if (!d) return;
+            if (localEditSeq !== seqAtRequest || cloudSavePending) {
+              console.warn(
+                "[cloud] 轮询返回期间有本地新编辑，丢弃本次云端快照避免覆盖",
+              );
+              return;
+            }
+            if (applyCloudData(d)) toast("📡 数据已从云端更新", "success");
           });
         }, 20000);
       }
@@ -2074,6 +2091,39 @@
         "staminaExpectedLow",
       ];
 
+      // localStorage 在 file:// 直开、隐私模式、禁用存储等环境下会直接抛异常；
+      // 全站改用这两个包装，禁止存储时降级为内存表，页面功能不受影响。
+      const __lsMem = {};
+      function lsGet(key) {
+        try {
+          return localStorage["get" + "Item"](key);
+        } catch (e) {
+          return Object.prototype.hasOwnProperty.call(__lsMem, key)
+            ? __lsMem[key]
+            : null;
+        }
+      }
+      function lsSet(key, val) {
+        try {
+          localStorage["set" + "Item"](key, val);
+          return true;
+        } catch (e) {
+          __lsMem[key] = String(val);
+          return false;
+        }
+      }
+      function lsDel(key) {
+        try {
+          localStorage["remove" + "Item"](key);
+        } catch (e) {}
+        delete __lsMem[key];
+      }
+      const LSS = {
+        getItem: lsGet,
+        setItem: lsSet,
+        removeItem: lsDel,
+      };
+
       function loadData() {
         try {
           // Auto-migrate from old storage keys
@@ -2083,19 +2133,19 @@
             "mmo_craft_calc_v2new",
           ];
           for (var i = 0; i < oldKeys.length; i++) {
-            var oldRaw = localStorage.getItem(oldKeys[i]);
+            var oldRaw = lsGet(oldKeys[i]);
             if (oldRaw) {
               try {
                 var oldData = JSON.parse(oldRaw);
                 if (oldData.products && oldData.products.length > 0) {
-                  localStorage.setItem(STORAGE_KEY, oldRaw);
-                  localStorage.removeItem(oldKeys[i]);
+                  lsSet(STORAGE_KEY, oldRaw);
+                  lsDel(oldKeys[i]);
                   break;
                 }
               } catch (e) {}
             }
           }
-          const raw = localStorage.getItem(STORAGE_KEY);
+          const raw = lsGet(STORAGE_KEY);
           if (raw) {
             const d = JSON.parse(raw);
             // Migrate old format if needed: playerMaterials without category
@@ -2147,8 +2197,8 @@
         data.products.forEach(function (p) {
           if (p.doubleChance !== undefined) dc[p.id] = p.doubleChance;
         });
-        localStorage.setItem("mmo_doubleChance", JSON.stringify(dc));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        lsSet("mmo_doubleChance", JSON.stringify(dc));
+        lsSet(STORAGE_KEY, JSON.stringify(data));
         cloudSaveDebounced(data);
       }
 
@@ -2156,22 +2206,26 @@
       let activeProductForm = null; // 'potion' | 'cultivate' | null
       let tempIngredients = [];
       let sortState = (function () {
+        // 紧凑模式会隐藏「原料成本 / 基础利润率」两列：在这两列不可见时
+        // 不能拿它们当排序字段，否则首屏会按看不见的列排序（表头也没有提示）。
+        // 注意：这里读 localStorage 而不是 body 属性——紧凑模式的 body 属性
+        // 在文件末尾的 INIT 里才设置，此处读 DOM 会永远拿到旧值。
+        const compactOn = lsGet("mmo_craft_compact") === "true";
+        const allowed = (f) =>
+          SORT_FIELDS.includes(f) &&
+          !(compactOn && (f === "cost" || f === "profitRate"));
         try {
           const s = JSON.parse(
-            localStorage.getItem("mmo_craft_sort") || "null",
+            lsGet("mmo_craft_sort") || "null",
           );
           if (s && s.potion && s.cultivate) {
             return {
               potion: {
-                field: SORT_FIELDS.includes(s.potion.field)
-                  ? s.potion.field
-                  : "profit",
+                field: allowed(s.potion.field) ? s.potion.field : "profit",
                 asc: s.potion.asc === true,
               },
               cultivate: {
-                field: SORT_FIELDS.includes(s.cultivate.field)
-                  ? s.cultivate.field
-                  : "profit",
+                field: allowed(s.cultivate.field) ? s.cultivate.field : "profit",
                 asc: s.cultivate.asc === true,
               },
             };
@@ -2184,7 +2238,7 @@
       })();
       let trendChart = null;
       let leftPanelVisible =
-        localStorage.getItem("mmo_craft_left_panel") !== "false";
+        lsGet("mmo_craft_left_panel") !== "false";
 
       // ==================== UTILS ====================
       function genId() {
@@ -2204,10 +2258,40 @@
       function fmtPct(n) {
         return Number(n).toFixed(1) + "%";
       }
+      // 本地日期键 YYYY-MM-DD。历史记录里的 date 是 ISO(UTC)，
+      // 直接 slice(0,10) 会按 UTC 分天：UTC+8 用户在本地 00:00–08:00 记的数据
+      // 会被算进"昨天"（趋势图因此错位），故一律按本地时区取日期。
+      function localDateKey(d) {
+        const dt = d instanceof Date ? d : new Date(d);
+        if (isNaN(dt.getTime())) return "";
+        return (
+          dt.getFullYear() +
+          "-" +
+          String(dt.getMonth() + 1).padStart(2, "0") +
+          "-" +
+          String(dt.getDate()).padStart(2, "0")
+        );
+      }
+      // HTML 转义必须覆盖引号：innerHTML 序列化只保证转义 & < >，
+      // 而本文件多处把 esc() 的结果放进 value="/title=" 属性里，
+      // 含引号的名字会撑破属性（导入/云端数据可携带任意字符）。
+      // 带一次自检：极端环境下若浏览器序列化异常，自动退化为纯手写转义。
       function esc(s) {
-        const d = document.createElement("div");
-        d.textContent = s;
-        return d.innerHTML;
+        const str = String(s == null ? "" : s);
+        const fallback = str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+        try {
+          const d = document.createElement("div");
+          d.textContent = str;
+          const out = d.innerHTML;
+          return out.indexOf("&quot;") !== -1 ? out : fallback;
+        } catch (e) {
+          return fallback;
+        }
       }
 
       // ==================== EVENT DELEGATION ====================
@@ -3400,14 +3484,8 @@
           st.field = field;
           st.asc = field === "name";
         }
-        localStorage.setItem("mmo_craft_sort", JSON.stringify(sortState));
+        lsSet("mmo_craft_sort", JSON.stringify(sortState));
         renderProductTable(cat);
-      }
-
-      function sortKey(e, cat, field) {
-        if (e.key !== "Enter" && e.key !== " ") return;
-        e.preventDefault();
-        sortProducts(cat, field);
       }
 
       // ---- Import / Export ----
@@ -3468,6 +3546,10 @@
       const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
       function safeId(id) {
         return typeof id === "string" && SAFE_ID_RE.test(id) ? id : genId();
+      }
+      // 与 safeId 相对：非法/缺失一律返回 null，配合 filter 真正丢弃坏行
+      function strictId(id) {
+        return typeof id === "string" && SAFE_ID_RE.test(id) ? id : null;
       }
       function numOr(v, dflt) {
         const n = Number(v);
@@ -3536,7 +3618,11 @@
                 const ingredients = Array.isArray(p.ingredients)
                   ? p.ingredients
                       .map((i) => ({
-                        materialId: safeId(i && i.materialId),
+                        // 注意：这里必须用「非法即 null」的严格版。
+                        // 若用 safeId()（非法会补一个新 id），下面 filter 就永远为真，
+                        // 指向不存在材料的原料会变成悬空 id：多算一条原料、
+                        // 显示"(已删除)"、成本按 0 计，还会随云同步扩散给群友。
+                        materialId: strictId(i && i.materialId),
                         materialType:
                           (i && i.materialType) === "player"
                             ? "player"
@@ -3654,7 +3740,7 @@
         };
         freightPresets = [];
         freightSlots = [null, null, null, null, null, null, null, null];
-        localStorage.removeItem("freight_slots");
+        lsDel("freight_slots");
         saveData();
         loadFreightData();
         renderAll();
@@ -3669,11 +3755,11 @@
           const BL_KEY = "mmo_price_baselines";
           let baselines = {};
           try {
-            baselines = JSON.parse(localStorage.getItem(BL_KEY) || "{}") || {};
+            baselines = JSON.parse(lsGet(BL_KEY) || "{}") || {};
           } catch (e) {}
           if (!baselines[key]) {
             baselines[key] = price;
-            localStorage.setItem(BL_KEY, JSON.stringify(baselines));
+            lsSet(BL_KEY, JSON.stringify(baselines));
             return;
           }
           const base = baselines[key];
@@ -3778,14 +3864,32 @@
       }
 
       // Lazy-load Chart.js only when a trend item is actually selected
-      // 多 CDN 回退：jsdelivr 被网络阻断时依次尝试 unpkg / cdnjs
+      // 多 CDN 回退：2026-09 实测每条 URL 的 HTTP 200 + SRI 字节一致性，
+      // 原来写的 unpkg / cdnjs 两个地址都是 404（等于没有回退），已换成：
+      //   - jsdelivr 主站 + 两个同源镜像（jsdmirror / onmicrosoft，国内可达性更好）
+      //   - unpkg 的「非压缩版」（该包根本没有 .min.js），单独配自己的 SRI
       const CHART_JS_URLS = [
-        "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js",
-        "https://unpkg.com/chart.js@4.4.7/dist/chart.umd.min.js",
-        "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.min.js",
+        {
+          url: "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js",
+          integrity:
+            "sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC",
+        },
+        {
+          url: "https://cdn.jsdmirror.com/npm/chart.js@4.4.7/dist/chart.umd.min.js",
+          integrity:
+            "sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC",
+        },
+        {
+          url: "https://jsd.onmicrosoft.cn/npm/chart.js@4.4.7/dist/chart.umd.min.js",
+          integrity:
+            "sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC",
+        },
+        {
+          url: "https://unpkg.com/chart.js@4.4.7/dist/chart.umd.js",
+          integrity:
+            "sha384-zYPBGXwO4633CABX/5Spf6emCKUJCfoOkhOMYyxMsatqQZPnDblmmOewfjsIVWCM",
+        },
       ];
-      const CHART_JS_INTEGRITY =
-        "sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC";
       let chartJsPromise = null;
       function ensureChartJs() {
         if (window.Chart) return Promise.resolve();
@@ -3798,9 +3902,10 @@
               reject(new Error("Chart.js 网络加载失败"));
               return;
             }
+            const entry = CHART_JS_URLS[idx++];
             const s = document.createElement("script");
-            s.src = CHART_JS_URLS[idx++];
-            s.integrity = CHART_JS_INTEGRITY;
+            s.src = entry.url;
+            if (entry.integrity) s.integrity = entry.integrity;
             s.crossOrigin = "anonymous";
             s.onload = () => {
               if (window.Chart) {
@@ -3884,11 +3989,12 @@
           (a, b) => new Date(a.date) - new Date(b.date),
         );
         // Aggregate: today's data kept raw, older days averaged
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateKey(new Date());
         const grouped = {};
         const todayEntries = [];
         sorted.forEach((h) => {
-          const d = h.date.slice(0, 10); // YYYY-MM-DD
+          const d = localDateKey(h.date); // 本地日期，避免 UTC 分天错位
+          if (!d) return;
           if (!grouped[d]) grouped[d] = [];
           grouped[d].push(h.price);
           if (d === today) todayEntries.push(h);
@@ -3990,16 +4096,33 @@
       }
 
       // ---- Toast ----
+      // 队列化：原来新消息会直接 remove() 掉还没显示完的旧消息，
+      // 云端轮询提示一撞上就会把用户操作反馈截断到 0.2 秒。
+      let toastTimer = null;
+      const toastQueue = [];
       function toast(msg, type) {
-        const exist = document.querySelector(".toast");
-        if (exist) exist.remove();
+        const text = String(msg);
+        toastQueue.push({ text, type: type || "success" });
+        if (toastTimer) return; // 有正在显示的，排到后面依次出
+        showNextToast();
+      }
+      function showNextToast() {
+        const item = toastQueue.shift();
+        if (!item) {
+          toastTimer = null;
+          return;
+        }
         const t = document.createElement("div");
-        t.className = "toast toast-" + (type || "success");
+        t.className = "toast toast-" + item.type;
         t.setAttribute("role", "status");
         t.setAttribute("aria-live", "polite");
-        t.textContent = msg;
+        t.textContent = item.text;
         document.body.appendChild(t);
-        setTimeout(() => t.remove(), 2000);
+        const dur = 2000 + Math.min(1500, item.text.length * 15); // 长文案多停一会儿
+        toastTimer = setTimeout(() => {
+          t.remove();
+          showNextToast();
+        }, dur);
       }
 
       // ---- Keyboard ----
@@ -4082,57 +4205,76 @@
           e.innerHTML = "暂无记录";
         }
       }
+      // 把 data / localStorage 里的货运状态同步到模块变量，并渲染。
+      // 返回 true 表示显示相关状态确实变了（外部据此决定是否重渲染）。
+      // 这样它可以在每次云端更新后无条件调用，而不会做无意义的重绘。
       function loadFreightData() {
+        const displaySnapshot = () =>
+          JSON.stringify([
+            freightPresets,
+            freightSlots,
+            normalTasks,
+            normalExcludes,
+            treasurePrice,
+            kunPrice,
+            kunRate,
+            customOppCost,
+            pessimisticRate,
+          ]);
+        const before = displaySnapshot();
         if (data.freightPresets) freightPresets = data.freightPresets;
         // 补全缺失的预设 id：预设列表按名称排序展示，DOM 顺序 ≠ 数组顺序，
         // 因此槽位/删除必须用稳定 id 关联，不能再用数组下标（下标已导致串位）。
-        let patched = false;
         const seenPresetIds = {};
         freightPresets.forEach(function (pr) {
           if (!pr || typeof pr !== "object") return;
           var pid = pr.id;
-          if (typeof pid !== "string" || !SAFE_ID_RE.test(pid) || seenPresetIds[pid]) {
+          if (
+            typeof pid !== "string" ||
+            !SAFE_ID_RE.test(pid) ||
+            seenPresetIds[pid]
+          ) {
             pr.id = genId();
-            patched = true;
           }
           seenPresetIds[pr.id] = true;
         });
-        if (patched) {
-          data.freightPresets = freightPresets;
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-          } catch (e) {}
-        }
-        treasurePrice = Number(data.treasurePrice) || 0;
-        // 悲观比例：个人设置，仅本地保存，不参与云同步
-        pessimisticRate =
-          parseInt(localStorage.getItem("pessimisticRate")) || 90;
+        treasurePrice = Math.max(0, Math.round(Number(data.treasurePrice) || 0));
+        // 悲观比例：个人设置，仅本地保存，不参与云同步（历史脏值在此夹取回来）
+        pessimisticRate = Math.round(
+          clampNum(lsGet("pessimisticRate"), 50, 100, 90),
+        );
         document.getElementById("pessimisticRate").value = pessimisticRate;
         // 乾坤藏宝图价格/比例：参与云同步，老版本无此字段时回退到本地设置
-        const localKun = parseInt(localStorage.getItem("kunPrice")) || 0;
+        const localKun = clampNum(lsGet("kunPrice"), 0, 1e9, 0);
         kunPrice =
-          data.kunPrice !== undefined ? Number(data.kunPrice) || 0 : localKun;
+          data.kunPrice !== undefined
+            ? Math.round(clampNum(data.kunPrice, 0, 1e9, 0))
+            : Math.round(localKun);
         document.getElementById("kunPrice").value = kunPrice;
-        const localKunRate =
-          parseFloat(localStorage.getItem("kunRate")) || 97.5;
+        const localKunRate = clampNum(lsGet("kunRate"), 50, 100, 97.5);
         kunRate =
           data.kunRate !== undefined
-            ? Number(data.kunRate) || 97.5
+            ? clampNum(data.kunRate, 50, 100, 97.5)
             : localKunRate;
         document.getElementById("kunRate").value = kunRate;
         // 体力机会成本：个人设置，仅本地保存；0/留空 = 自动计算
-        customOppCost = parseFloat(localStorage.getItem("customOppCost")) || 0;
+        customOppCost = clampNum(lsGet("customOppCost"), 0, 1e9, 0);
         document.getElementById("customOppCost").value =
           customOppCost > 0 ? customOppCost : "";
         document.getElementById("treasurePrice").value = treasurePrice;
         updateTreasureModInfo();
         // Load local slots
         try {
-          const s = localStorage.getItem("freight_slots");
-          if (s) freightSlots = JSON.parse(s);
+          const s = lsGet("freight_slots");
+          if (s) {
+            const parsed = JSON.parse(s);
+            // 只接受长度正确的数组：手工或损坏的数据不该把 8 个槽位打乱
+            if (Array.isArray(parsed) && parsed.length === freightSlots.length)
+              freightSlots = parsed;
+          }
         } catch (e) {}
         // Load local ordinary tasks; first time auto-seed from example if products exist
-        const normalRaw = localStorage.getItem("mmo_normal_freight_tasks");
+        const normalRaw = lsGet("mmo_normal_freight_tasks");
         try {
           if (normalRaw) normalTasks = JSON.parse(normalRaw);
           else normalTasks = [];
@@ -4140,7 +4282,7 @@
           normalTasks = [];
         }
         // 普通货运排除商品（本地）
-        const excRaw = localStorage.getItem("mmo_normal_freight_excludes");
+        const excRaw = lsGet("mmo_normal_freight_excludes");
         try {
           normalExcludes = excRaw
             ? JSON.parse(excRaw)
@@ -4159,7 +4301,9 @@
           });
           if (normalTasks.length !== beforeCount) saveNormalTasks();
         }
-        renderFreight();
+        const changed = displaySnapshot() !== before;
+        if (changed) renderFreight();
+        return changed;
       }
 
       function seedNormalTasksIfEmpty() {
@@ -4182,22 +4326,36 @@
         return false;
       }
 
+      // 夹取工具：输入框的 min/max 拦不住手输，而这些值会进云同步，必须服务端式兜底
+      function clampNum(v, lo, hi, dflt) {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return dflt;
+        return Math.min(hi, Math.max(lo, n));
+      }
+
       function savePessimisticRate() {
-        pessimisticRate =
-          parseInt(document.getElementById("pessimisticRate").value) || 90;
-        localStorage.setItem("pessimisticRate", pessimisticRate);
+        const el = document.getElementById("pessimisticRate");
+        pessimisticRate = Math.round(
+          clampNum(el.value, 50, 100, 90),
+        );
+        el.value = pessimisticRate; // 回写，让用户看到被夹取后的真实值
+        lsSet("pessimisticRate", pessimisticRate);
       }
 
       function saveKunPrice() {
-        kunPrice = parseInt(document.getElementById("kunPrice").value) || 0;
-        localStorage.setItem("kunPrice", kunPrice);
+        const el = document.getElementById("kunPrice");
+        kunPrice = Math.round(clampNum(el.value, 0, 1e9, 0));
+        el.value = kunPrice;
+        lsSet("kunPrice", kunPrice);
         data.kunPrice = kunPrice;
         saveData();
       }
 
       function saveKunRate() {
-        kunRate = parseFloat(document.getElementById("kunRate").value) || 97.5;
-        localStorage.setItem("kunRate", kunRate);
+        const el = document.getElementById("kunRate");
+        kunRate = clampNum(el.value, 50, 100, 97.5);
+        el.value = kunRate;
+        lsSet("kunRate", kunRate);
         data.kunRate = kunRate;
         saveData();
       }
@@ -4206,11 +4364,11 @@
         const v = parseFloat(document.getElementById("customOppCost").value);
         if (isNaN(v) || v <= 0) {
           customOppCost = 0;
-          localStorage.removeItem("customOppCost");
+          lsDel("customOppCost");
           document.getElementById("customOppCost").value = "";
         } else {
           customOppCost = v;
-          localStorage.setItem("customOppCost", String(v));
+          lsSet("customOppCost", String(v));
         }
       }
 
@@ -4230,7 +4388,7 @@
           tab === "adv" ? "" : "none";
       }
       function saveNormalTasks() {
-        localStorage.setItem(
+        lsSet(
           "mmo_normal_freight_tasks",
           JSON.stringify(normalTasks),
         );
@@ -4316,7 +4474,7 @@
           .map((s) => s.trim())
           .filter(Boolean);
         normalExcludes = [...new Set(parts)];
-        localStorage.setItem(
+        lsSet(
           "mmo_normal_freight_excludes",
           JSON.stringify(normalExcludes),
         );
@@ -4423,7 +4581,7 @@
       }
 
       function saveFreightSlots() {
-        localStorage.setItem("freight_slots", JSON.stringify(freightSlots));
+        lsSet("freight_slots", JSON.stringify(freightSlots));
       }
 
       function renderFreightGrid() {
@@ -4813,17 +4971,27 @@
           scenarios[0],
         );
 
-        // Mark order on slots
+        // Mark order on slots.
+        // 槽位与结果必须一对一配对：同一方案（产物+数量）可能被放进多个槽位，
+        // 早期用 find(productId+qty) 永远命中第一个匹配槽位，
+        // 导致「第 1 个槽位被反复改写、后面相同方案的槽位没有名次」，与结果表对不上。
         freightSlots.forEach((s) => {
           if (s) delete s.order;
         });
-        results.forEach((r, i) => {
-          if (i < best.n) {
-            const slot = freightSlots.find(
-              (s) => s && s.productId === r.productId && s.qty === r.qty,
-            );
-            if (slot) slot.order = i + 1;
-          }
+        const pendingSlots = new Map(); // 方案签名 -> 还没被标记的槽位下标队列
+        freightSlots.forEach((s, idx) => {
+          if (!s) return;
+          const sig = s.productId + "\u0000" + s.qty;
+          if (!pendingSlots.has(sig)) pendingSlots.set(sig, []);
+          pendingSlots.get(sig).push(idx);
+        });
+        const shown = results.filter((r) => r.valid !== false);
+        shown.forEach((r, i) => {
+          if (i >= best.n) return; // 只给推荐提交的前 N 个标记名次
+          const queue = pendingSlots.get(r.productId + "\u0000" + r.qty);
+          if (!queue || !queue.length) return;
+          const slotIdx = queue.shift();
+          freightSlots[slotIdx].order = i + 1;
         });
         saveFreightSlots();
         renderFreightGrid();
@@ -4839,6 +5007,13 @@
           ' ℹ<span class="tip-popup">' +
           tip +
           "</span></span></th>";
+        // 下面两个判断与当前方案无关，提前算一次（原来写在 map 里每个方案重算一遍）
+        const allNormalNeg = scenarios.every(function (x) {
+          return x.grandTotal <= 0;
+        });
+        const allPessNeg = scenarios.every(function (x) {
+          return x.pessGrand <= 0;
+        });
         summary.innerHTML =
           "<b>📊 计算结果</b>（体力机会成本：" +
           fmtDec(oppCostRate, 1) +
@@ -4971,12 +5146,6 @@
                 kunIncome = kunFragTotal + kunBonus;
               }
               var kunNet = kunIncome > 0 ? kunIncome - totalCost : null;
-              var allNormalNeg = scenarios.every(function (x) {
-                return x.grandTotal <= 0;
-              });
-              var allPessNeg = scenarios.every(function (x) {
-                return x.pessGrand <= 0;
-              });
               var profitRate =
                 totalCost > 0 ? (s.grandTotal / totalCost) * 100 : 0;
               var normalLabel =
@@ -5049,16 +5218,19 @@
               sortState[cat].field === "profitRate"
             ) {
               sortState[cat] = { field: "profit", asc: false };
-              renderProductTable(cat);
             }
           });
-          localStorage.setItem("mmo_craft_sort", JSON.stringify(sortState));
+          lsSet("mmo_craft_sort", JSON.stringify(sortState));
+          // 必须重绘（含表头）：renderTableHead 才会刷新 sorted 高亮与列，否则
+          // 表头仍显示已被隐藏/已改变的排序状态
+          renderProductTable("potion");
+          renderProductTable("cultivate");
         }
-        localStorage.setItem("mmo_craft_compact", isCompact ? "false" : "true");
+        lsSet("mmo_craft_compact", isCompact ? "false" : "true");
       }
       function switchTheme(val) {
         document.body.setAttribute("data-theme", val);
-        localStorage.setItem("mmo_craft_theme", val);
+        lsSet("mmo_craft_theme", val);
       }
 
       function applyLeftPanel() {
@@ -5078,7 +5250,7 @@
       }
       function toggleLeftPanel() {
         leftPanelVisible = !leftPanelVisible;
-        localStorage.setItem(
+        lsSet(
           "mmo_craft_left_panel",
           leftPanelVisible ? "true" : "false",
         );
@@ -5125,6 +5297,31 @@
 
       let dragSrcCard = null;
 
+      // 卡片位置持久化：原来只改 DOM，刷新即丢失，容易让人以为"拖拽没生效"
+      function saveCardOrder() {
+        const order = Array.from(document.querySelectorAll(".drag-card"))
+          .map((c) => c.id)
+          .filter(Boolean);
+        lsSet("mmo_craft_card_order", order.join(","));
+      }
+      function applyCardOrder() {
+        const raw = lsGet("mmo_craft_card_order");
+        if (!raw) return;
+        const order = raw.split(",").filter(Boolean);
+        if (!order.length) return;
+        // 按「当前所在容器」分组保存的目标顺序，逐容器重排，绝不跨面板搬运
+        const byParent = new Map();
+        order.forEach((id) => {
+          const card = document.getElementById(id);
+          if (!card || !card.parentElement) return;
+          if (!byParent.has(card.parentElement)) byParent.set(card.parentElement, []);
+          byParent.get(card.parentElement).push(card);
+        });
+        byParent.forEach((cards, parent) => {
+          cards.forEach((c) => parent.appendChild(c)); // 按目标顺序依次移到末尾
+        });
+      }
+
       function onDragStart(e) {
         dragSrcCard = this.closest(".drag-card");
         if (dragSrcCard) {
@@ -5146,13 +5343,11 @@
       function onDragOver(e) {
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
-        if (
-          this !== dragSrcCard &&
-          this.parentElement === dragSrcCard?.parentElement &&
-          this.classList.contains("drag-card")
-        ) {
-          this.classList.add("drag-over");
-        }
+        // dragSrcCard 可能为 null（例如从页面外拖入内容），必须显式判空
+        if (!dragSrcCard || dragSrcCard === this) return;
+        if (!this.classList.contains("drag-card")) return;
+        if (this.parentElement !== dragSrcCard.parentElement) return;
+        this.classList.add("drag-over");
       }
 
       function onDragLeave(e) {
@@ -5178,16 +5373,17 @@
         } else {
           parent.insertBefore(dragSrcCard, this);
         }
+        saveCardOrder();
         toast("位置已交换", "success");
       }
 
       // ==================== INIT ====================
       (function () {
-        const saved = localStorage.getItem("mmo_craft_theme") || "default";
+        const saved = lsGet("mmo_craft_theme") || "default";
         document.body.setAttribute("data-theme", saved);
         const sel = document.getElementById("themeSelect");
         if (sel) sel.value = saved;
-        const comp = localStorage.getItem("mmo_craft_compact") === "true";
+        const comp = lsGet("mmo_craft_compact") === "true";
         if (comp) {
           document.body.setAttribute("data-compact", "true");
           const cb = document.getElementById("compactToggle");
@@ -5198,6 +5394,7 @@
         }
       })();
       applyLeftPanel();
+      applyCardOrder(); // 恢复上次拖拽的卡片顺序（在渲染/绑定之前，避免视觉跳动）
       renderAll();
       loadFreightData();
       initFreightDrag();
@@ -5209,8 +5406,15 @@
       initCloud().then((ok) => {
         if (!ok) return;
         cloudListen();
+        // 首屏这次拉取同样要防覆盖：请求在途期间用户可能已经改了数据
+        const seqAtBoot = localEditSeq;
         cloudLoad().then((d) => {
-          if (d) applyCloudData(d);
+          if (!d) return;
+          if (localEditSeq !== seqAtBoot || cloudSavePending) {
+            console.warn("[cloud] 首屏拉取期间有本地新编辑，跳过云端覆盖");
+            return;
+          }
+          applyCloudData(d);
         });
         // 记录访问日志
         fetch("https://api.ipify.org?format=json")
