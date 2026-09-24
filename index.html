@@ -10,6 +10,7 @@
     />
     <meta name="theme-color" content="#0f0f1a" />
     <style>
+      [hidden] { display: none !important; }
       /* ========== Reset & Variables ========== */
       *,
       *::before,
@@ -1254,9 +1255,15 @@
           data-action="exportData"
           title="导出数据为JSON文件"
         >
-          📥 导出
+          📥 导出共享数据
         </button>
-        <button class="btn btn-sm" data-action="importClick">📤 导入</button>
+        <button class="btn btn-sm" data-action="exportBackup">完整备份（含个人设置）</button>
+        <button class="btn btn-sm" data-action="importClick">📤 导入 / 恢复</button>
+        <button class="btn btn-sm" id="customOrderToggle" data-action="toggleCustomOrder" aria-pressed="false">自定义顺序：关（本地）</button>
+        <button class="btn btn-sm" id="saveOrderButton" data-action="saveCustomOrder" hidden>保存顺序</button>
+        <button class="btn btn-sm" id="retrySyncButton" data-action="retrySync" hidden>重试同步</button>
+        <button class="btn btn-sm" id="useCloudButton" data-action="useCloud" hidden>使用云端版本</button>
+        <button class="btn btn-sm" id="useLocalButton" data-action="useLocal" hidden>用本地覆盖云端</button>
         <input
           type="file"
           id="importFile"
@@ -1478,25 +1485,10 @@
             <div class="stat-label">最后更新</div>
           </div>
         </div>
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
-            font-size: 0.72rem;
-            color: var(--text-dim);
-          "
-        >
-          <span
-            id="nickDisplay"
-            style="cursor: pointer"
-            data-action="setNickname"
-            title="点击设置昵称"
-            >👤 未设置昵称</span
-          >
-        </div>
-
+        <p style="color:var(--text-dim);font-size:.8rem;margin-bottom:12px">
+          共享：材料/产物价格、配方、货运预设、宝图价格及乾坤比例。<br>
+          仅本地：双倍概率、悲观比例、体力机会成本、货运任务/槽位、产物顺序与界面设置。
+        </p>
         <!-- Trend Chart (hidden) -->
         <div class="card" id="trendCard" style="display: none">
           <div class="card-header">
@@ -1867,27 +1859,19 @@
 
     <script>
       // ==================== DATA STORE ====================
+      const __lsMem = {};
       const STORAGE_KEY = "mmo_craft_cloud_v1";
+      const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
       const DATA_VERSION = 2; // 数据结构版本，用于自动迁移/兼容
       const SUPABASE_URL = "https://voreyobicculgcfudfae.supabase.co";
       const SUPABASE_KEY = "sb_publishable_AijTqALCInLK0Ip6bokqgA__wSHIlle";
       const SUPABASE_REST = SUPABASE_URL + "/rest/v1";
 
-      let nickname = lsGet("nickname") || "";
-      function setNickname() {
-        var n = prompt("设置你的昵称（群友能看到谁更新了数据）：", nickname);
-        if (n !== null && n.trim()) {
-          nickname = n.trim();
-          lsSet("nickname", nickname);
-          document.getElementById("nickDisplay").textContent = "👤 " + nickname;
-        }
-      }
-
       function updateLastUpdate() {
         var el = document.getElementById("statLastUpdate");
         var info = document.getElementById("statUpdateInfo");
         if (!el || !info) return;
-        if (data.lastUpdatedAt && data.lastUpdatedBy) {
+        if (data.lastUpdatedAt) {
           var d = new Date(data.lastUpdatedAt);
           var ago = Math.floor((Date.now() - d) / 60000);
           var t =
@@ -1898,7 +1882,7 @@
                 : ago < 1440
                   ? Math.floor(ago / 60) + "小时前"
                   : Math.floor(ago / 1440) + "天前";
-          info.textContent = data.lastUpdatedBy + " · " + t;
+          info.textContent = t;
           el.style.display = "block";
         }
       }
@@ -1923,159 +1907,207 @@
         };
       }
 
-      async function initCloud() {
-        setCloudStatus("☁️ 连接中…", "");
-        try {
-          // 探测 Supabase REST API 是否可达（表有数据或空数组都算可达）
-          const r = await fetch(
-            SUPABASE_REST + "/game_data?select=id&limit=1",
-            { headers: supabaseHeaders() },
-          );
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          cloudEnabled = true;
-          setCloudStatus("☁️ 云端已连接", "ok");
-          return true;
-        } catch (e) {
-          console.warn("[cloud] 云端功能不可用：", e);
-          cloudEnabled = false;
-          setCloudStatus("⚠️ 离线 · 仅本地", "off");
-          return false;
-        }
-      }
-
-      async function cloudLoad() {
-        if (!cloudEnabled) return null;
-        try {
-          const r = await fetch(
-            SUPABASE_REST + "/game_data?select=data&id=eq.v2",
-            { headers: supabaseHeaders() },
-          );
-          if (!r.ok) return null;
-          const rows = await r.json();
-          if (Array.isArray(rows) && rows.length && rows[0].data)
-            return rows[0].data;
-        } catch (e) {
-          console.warn("[cloud] 加载失败：", e);
-        }
-        return null;
-      }
-
-      // Sanitize remote/cloud payloads through the same validator as file import
-      function applyCloudData(d) {
-        try {
-          const cleaned = normalizeImportedData(d);
-          // 恢复本地 doubleChance（不从云端覆盖）
-          try {
-            var dc = JSON.parse(
-              lsGet("mmo_doubleChance") || "{}",
-            );
-            cleaned.products.forEach(function (p) {
-              if (dc[p.id] !== undefined) p.doubleChance = dc[p.id];
-            });
-          } catch (e) {}
-          // data 与本地缓存一致时跳过「材料/产物表」的重绘，避免刷新时列表先按本地
-          // 旧顺序绘制、再被云端数据重新绘制造成的闪动。但货运状态（预设库/槽位/
-          // 普通任务）与 data 是两套变量，必须无条件同步，否则界面会停在旧内容上，
-          // 只能靠手动刷新才对齐。
-          const changed = JSON.stringify(data) !== JSON.stringify(cleaned);
-          data = cleaned;
-          if (changed) {
-            // 回写本地缓存：下次刷新首屏就是云端最新顺序
-            try {
-              lsSet(STORAGE_KEY, JSON.stringify(data));
-            } catch (e) {}
-          }
-          // loadFreightData 内部已按需渲染货运区，此处不必再调 renderFreight
-          loadFreightData();
-          if (changed) renderAll();
-          return true;
-        } catch (e) {
-          console.warn("[cloud] 云端数据格式异常：", e);
-          return false;
-        }
-      }
-
-      async function cloudSave(d) {
-        if (!cloudEnabled) return;
-        setCloudStatus("☁️ 同步中…", "");
-        cloudSyncing = true;
-        try {
-          var uploadData = JSON.parse(JSON.stringify(d));
-          uploadData.products.forEach(function (p) {
-            delete p.doubleChance;
-          });
-          const r = await fetch(SUPABASE_REST + "/game_data", {
-            method: "POST",
-            headers: Object.assign(supabaseHeaders(), {
-              Prefer: "resolution=merge-duplicates,return=minimal",
-            }),
-            body: JSON.stringify({
-              id: "v2",
-              data: uploadData,
-              updated_at: new Date().toISOString(),
-            }),
-          });
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          setCloudStatus("☁️ 已同步", "ok");
-        } catch (e) {
-          console.warn("[cloud] 保存失败：", e);
-          setCloudStatus("⚠️ 同步失败", "err");
-        } finally {
-          cloudSyncing = false;
-        }
-      }
-
-      // Debounced cloud save: merge bursts of edits into one upsert, preserving order.
+      const SYNC_KEY = "mmo_cloud_sync_state";
+      let syncBase = null;
+      let cloudDirty = false;
+      let cloudConflict = false;
       let cloudSaveTimer = null;
       let cloudSavePending = null;
-      // 本地编辑代号：每次保存自增。applyCloudData 据此判断
-      // 「云端数据是不是在本地这次编辑之前就取回来的」，避免用旧快照覆盖新编辑。
       let localEditSeq = 0;
+      try {
+        const state = JSON.parse(lsGet(SYNC_KEY) || "null");
+        syncBase = state?.base || null;
+        cloudDirty = state?.pending === true;
+      } catch {}
+      function persistSyncState() {
+        lsSet(SYNC_KEY, JSON.stringify({ base: syncBase, pending: cloudDirty }));
+      }
+      function syncControls() {
+        document.getElementById("retrySyncButton").hidden = !cloudDirty || cloudConflict;
+        document.getElementById("useCloudButton").hidden = !cloudConflict;
+        document.getElementById("useLocalButton").hidden = !cloudConflict;
+      }
+      function sharedData(d) {
+        const result = JSON.parse(JSON.stringify(d));
+        delete result.lastUpdatedBy;
+        result.products.forEach(p => delete p.doubleChance);
+        return result;
+      }
+      function isEditing() {
+        return !!activeProductForm || !!document.querySelector(".modal-mask") ||
+          !!document.activeElement?.matches("input, textarea, select");
+      }
+      async function cloudLoad() {
+        const r = await fetch(SUPABASE_REST + "/game_data?select=data,updated_at&id=eq.v2", {
+          headers: supabaseHeaders(), signal: AbortSignal.timeout(12000),
+        });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const rows = await r.json();
+        if (!Array.isArray(rows)) throw new Error("云端响应格式错误");
+        return rows.length ? { exists: true, data: rows[0].data, updatedAt: rows[0].updated_at ?? null }
+          : { exists: false, data: null, updatedAt: null };
+      }
+      function rememberBase(remote) {
+        syncBase = { exists: remote.exists, updatedAt: remote.updatedAt };
+        persistSyncState();
+      }
+      function applyCloudData(d) {
+        const cleaned = normalizeImportedData(d);
+        let dc = {};
+        try { dc = JSON.parse(lsGet("mmo_doubleChance") || "{}"); } catch {}
+        cleaned.products.forEach(p => {
+          if (dc && dc[p.id] !== undefined) p.doubleChance = clampNum(dc[p.id], 0, 100, 0);
+        });
+        const before = sharedData(data), after = sharedData(cleaned);
+        const changed = JSON.stringify(before) !== JSON.stringify(after);
+        const names = [];
+        ["systemMaterials", "playerMaterials", "products", "freightPresets"].forEach(key => {
+          const previous = new Map(before[key]?.map(item => [item.id, item]) || []);
+          (after[key] || []).forEach(item => {
+            if (JSON.stringify(previous.get(item.id)) !== JSON.stringify(item)) names.push(item.name);
+            previous.delete(item.id);
+          });
+          previous.forEach(item => names.push(item.name + "（已删除）"));
+        });
+        if (changed) {
+          data = cleaned;
+          lsSet(STORAGE_KEY, JSON.stringify(data));
+          loadFreightData();
+          renderAll();
+        }
+        return { changed, names: [...new Set(names)] };
+      }
+      function markConflict() {
+        cloudConflict = true;
+        setCloudStatus("⚠️ 版本冲突 · 本地修改已保留", "err");
+        syncControls();
+      }
+      async function cloudSave() {
+        if (!cloudEnabled || !cloudDirty || cloudSyncing || cloudConflict) return;
+        cloudSyncing = true;
+        const seq = localEditSeq;
+        const payload = sharedData(data);
+        setCloudStatus("☁️ 同步中…", "");
+        try {
+          // Conditional update is atomic: a newer server revision must never be silently overwritten.
+          if (!syncBase) {
+            const remote = await cloudLoad();
+            if (remote.exists) { markConflict(); return; }
+            rememberBase(remote);
+          }
+          const exists = syncBase.exists;
+          const filter = syncBase.updatedAt === null ? "is.null" : "eq." + encodeURIComponent(syncBase.updatedAt);
+          const previousTime = Date.parse(syncBase.updatedAt) || 0;
+          const updatedAt = new Date(Math.max(Date.now(), previousTime + 1)).toISOString();
+          const r = await fetch(SUPABASE_REST + "/game_data" + (exists ? "?id=eq.v2&updated_at=" + filter : ""), {
+            method: exists ? "PATCH" : "POST",
+            headers: { ...supabaseHeaders(), Prefer: "return=representation" },
+            body: JSON.stringify({ id: "v2", data: payload, updated_at: updatedAt }),
+            signal: AbortSignal.timeout(12000),
+          });
+          if (r.status === 409) { markConflict(); return; }
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          const rows = await r.json();
+          if (!Array.isArray(rows) || !rows.length) { markConflict(); return; }
+          syncBase = { exists: true, updatedAt: rows[0].updated_at ?? updatedAt };
+          if (seq === localEditSeq) {
+            cloudDirty = false;
+            cloudSavePending = null;
+          }
+          persistSyncState();
+          setCloudStatus(cloudDirty ? "☁️ 还有修改待同步" : "☁️ 已同步", cloudDirty ? "off" : "ok");
+        } catch (e) {
+          console.warn("[cloud] 保存失败，本地修改保留等待重试", e);
+          setCloudStatus("⚠️ 同步失败 · 修改已保留，将自动重试", "err");
+        } finally {
+          cloudSyncing = false;
+          syncControls();
+        }
+      }
       function cloudSaveDebounced(d) {
         localEditSeq++;
+        cloudDirty = true;
         cloudSavePending = d;
-        if (cloudSaveTimer) return;
-        cloudSaveTimer = setTimeout(function () {
+        persistSyncState();
+        syncControls();
+        if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+        cloudSaveTimer = setTimeout(() => {
           cloudSaveTimer = null;
-          const payload = cloudSavePending;
-          cloudSavePending = null;
-          if (payload) cloudSave(payload);
+          cloudSave();
         }, 400);
       }
       function flushCloudSave() {
-        if (cloudSaveTimer) {
-          clearTimeout(cloudSaveTimer);
-          cloudSaveTimer = null;
-        }
-        if (cloudSavePending) {
-          const payload = cloudSavePending;
-          cloudSavePending = null;
-          cloudSave(payload);
-        }
+        // Local data and pending status are already persisted; reload safely resumes the queue.
+        if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+        cloudSaveTimer = null;
+        persistSyncState();
       }
       window.addEventListener("pagehide", flushCloudSave);
-
-      // 用轮询替代 Supabase Realtime（同样不依赖 SDK/CDN）：
-      // 本地有未上传改动或正在上传时跳过，避免旧云端数据覆盖本地新编辑。
-      function cloudListen() {
-        if (!cloudEnabled) return;
-        if (cloudPollTimer) return;
-        cloudPollTimer = setInterval(function () {
-          if (cloudSyncing || cloudSavePending) return;
-          // 记录请求发起时的本地编辑代号：请求在途期间若发生本地编辑，
-          // 回来的旧云端快照必须丢弃，否则会把新编辑覆盖掉。
-          const seqAtRequest = localEditSeq;
-          cloudLoad().then((d) => {
-            if (!d) return;
-            if (localEditSeq !== seqAtRequest || cloudSavePending) {
-              console.warn(
-                "[cloud] 轮询返回期间有本地新编辑，丢弃本次云端快照避免覆盖",
-              );
-              return;
+      let cloudReading = false;
+      async function pollCloud(notify = true) {
+        if (cloudSyncing || cloudReading || cloudConflict) return;
+        if (cloudDirty) { await cloudSave(); return; }
+        if (isEditing()) return;
+        cloudReading = true;
+        const seq = localEditSeq;
+        try {
+          const remote = await cloudLoad();
+          if (seq !== localEditSeq || cloudDirty || isEditing()) return;
+          if (remote.exists) {
+            const result = applyCloudData(remote.data);
+            if (notify && result.changed) {
+              const names = result.names.slice(0, 4).join("、");
+              toast("📡 云端更新：" + (names || "共享设置或价格历史") + (result.names.length > 4 ? " 等" + result.names.length + "项" : ""), "success");
             }
-            if (applyCloudData(d)) toast("📡 数据已从云端更新", "success");
-          });
-        }, 20000);
+          }
+          rememberBase(remote);
+          setCloudStatus("☁️ 已同步", "ok");
+        } catch (e) {
+          console.warn("[cloud] 加载失败", e);
+          setCloudStatus("⚠️ 云端暂不可用 · 本地数据保留", "off");
+        } finally { cloudReading = false; }
+      }
+      async function initCloud() {
+        cloudEnabled = true;
+        syncControls();
+        await pollCloud(false);
+        return true;
+      }
+      async function retryCloudSync() {
+        if (cloudReading || cloudSyncing) return;
+        cloudEnabled = true;
+        if (cloudDirty) await cloudSave(); else await pollCloud();
+      }
+      async function resolveCloudConflict(useLocal) {
+        if (cloudSyncing || cloudReading || isEditing()) {
+          toast("请先完成当前编辑，再处理版本冲突"); return;
+        }
+        const message = useLocal
+          ? "将用本地共享数据覆盖最新云端版本，其他使用者也会收到这些修改。继续吗？"
+          : "将放弃本地尚未同步的共享修改，使用云端版本。建议先完整备份。继续吗？";
+        if (!confirm(message)) return;
+        cloudReading = true;
+        const seq = localEditSeq;
+        try {
+          const remote = await cloudLoad();
+          if (seq !== localEditSeq || isEditing()) { toast("读取期间有新编辑，请重新处理冲突"); return; }
+          if (!useLocal && !remote.exists) { toast("云端没有可恢复的数据", "error"); return; }
+          if (!useLocal) {
+            applyCloudData(remote.data);
+            cloudDirty = false;
+            cloudSavePending = null;
+          }
+          rememberBase(remote);
+          cloudConflict = false;
+          syncControls();
+          if (useLocal) await cloudSave();
+          else setCloudStatus("☁️ 已使用云端版本", "ok");
+        } catch (e) { toast("读取云端失败，本地修改已保留", "error"); }
+        finally { cloudReading = false; }
+      }
+      function cloudListen() {
+        if (cloudPollTimer) return;
+        cloudPollTimer = setInterval(() => pollCloud(), 20000);
       }
       const SORT_FIELDS = [
         "name",
@@ -2093,8 +2125,8 @@
 
       // localStorage 在 file:// 直开、隐私模式、禁用存储等环境下会直接抛异常；
       // 全站改用这两个包装，禁止存储时降级为内存表，页面功能不受影响。
-      const __lsMem = {};
       function lsGet(key) {
+        if (Object.prototype.hasOwnProperty.call(__lsMem, key)) return __lsMem[key];
         try {
           return localStorage["get" + "Item"](key);
         } catch (e) {
@@ -2106,6 +2138,7 @@
       function lsSet(key, val) {
         try {
           localStorage["set" + "Item"](key, val);
+          delete __lsMem[key];
           return true;
         } catch (e) {
           __lsMem[key] = String(val);
@@ -2134,7 +2167,7 @@
           ];
           for (var i = 0; i < oldKeys.length; i++) {
             var oldRaw = lsGet(oldKeys[i]);
-            if (oldRaw) {
+            if (oldRaw && !lsGet(STORAGE_KEY)) {
               try {
                 var oldData = JSON.parse(oldRaw);
                 if (oldData.products && oldData.products.length > 0) {
@@ -2169,10 +2202,10 @@
             if (d.treasurePrice === undefined) d.treasurePrice = 0;
             // 悲观比例为个人设置，清除历史版本误同步到数据里的残留
             if (d.pessimisticRate !== undefined) delete d.pessimisticRate;
-            if (!d.lastUpdatedBy) d.lastUpdatedBy = "";
+            delete d.lastUpdatedBy;
             if (!d.lastUpdatedAt) d.lastUpdatedAt = "";
             d.schemaVersion = DATA_VERSION;
-            return d;
+            return normalizeImportedData(d);
           }
         } catch (e) {}
         return {
@@ -2183,29 +2216,28 @@
           priceHistory: {},
           freightPresets: [],
           treasurePrice: 0,
-          lastUpdatedBy: "",
           lastUpdatedAt: "",
         };
       }
 
-      function saveData() {
-        if (nickname) {
-          data.lastUpdatedBy = nickname;
-          data.lastUpdatedAt = new Date().toISOString();
-        }
+      function saveData(shared = true) {
+        delete data.lastUpdatedBy;
+        if (shared) data.lastUpdatedAt = new Date().toISOString();
         var dc = {};
         data.products.forEach(function (p) {
           if (p.doubleChance !== undefined) dc[p.id] = p.doubleChance;
         });
         lsSet("mmo_doubleChance", JSON.stringify(dc));
-        lsSet(STORAGE_KEY, JSON.stringify(data));
-        cloudSaveDebounced(data);
+        const stored = lsSet(STORAGE_KEY, JSON.stringify(data));
+        if (!stored) toast("浏览器无法保存数据；刷新后可能丢失，请导出完整备份", "error");
+        if (shared) cloudSaveDebounced(data);
       }
 
       let data = loadData();
       let activeProductForm = null; // 'potion' | 'cultivate' | null
       let tempIngredients = [];
-      let sortState = (function () {
+      let sortState = readSortState();
+      function readSortState() {
         // 紧凑模式会隐藏「原料成本 / 基础利润率」两列：在这两列不可见时
         // 不能拿它们当排序字段，否则首屏会按看不见的列排序（表头也没有提示）。
         // 注意：这里读 localStorage 而不是 body 属性——紧凑模式的 body 属性
@@ -2235,7 +2267,55 @@
           potion: { field: "profit", asc: false },
           cultivate: { field: "profit", asc: false },
         };
-      })();
+      }
+      let customOrderEnabled = lsGet("mmo_custom_order_enabled") === "true";
+      let customOrder = readCustomOrder();
+      let draftOrder = null;
+      function readCustomOrder() {
+        try {
+          const value = JSON.parse(lsGet("mmo_custom_order") || "{}");
+          return Object.fromEntries(["potion", "cultivate"].map(cat => [cat,
+            Array.isArray(value?.[cat]) ? [...new Set(value[cat].filter(id => typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id)))] : []]));
+        } catch { return { potion: [], cultivate: [] }; }
+      }
+      function productOrderIds(cat) {
+        const current = data.products.filter(p => p.category === cat).map(p => p.id);
+        const saved = (draftOrder || customOrder)[cat] || [];
+        return [...saved.filter(id => current.includes(id)), ...current.filter(id => !saved.includes(id))];
+      }
+      function updateOrderControls() {
+        const btn = document.getElementById("customOrderToggle");
+        btn.textContent = "自定义顺序：" + (customOrderEnabled ? "开" : "关") + "（本地）";
+        btn.setAttribute("aria-pressed", String(customOrderEnabled));
+        const save = document.getElementById("saveOrderButton");
+        save.hidden = !customOrderEnabled;
+        save.disabled = !draftOrder;
+        save.textContent = draftOrder ? "保存顺序（未保存）" : "顺序已保存";
+      }
+      function toggleCustomOrder() {
+        if (draftOrder && !confirm("顺序尚未保存，关闭将放弃本次调整。继续吗？")) return;
+        draftOrder = null;
+        customOrderEnabled = !customOrderEnabled;
+        lsSet("mmo_custom_order_enabled", String(customOrderEnabled));
+        updateOrderControls();
+        renderProductTable("potion"); renderProductTable("cultivate");
+      }
+      function moveProduct(cat, id, step) {
+        if (!customOrderEnabled || !["potion", "cultivate"].includes(cat) || ![-1, 1].includes(step)) return;
+        if (!draftOrder) draftOrder = { potion: productOrderIds("potion"), cultivate: productOrderIds("cultivate") };
+        const ids = productOrderIds(cat), index = ids.indexOf(id), target = index + step;
+        if (index < 0 || target < 0 || target >= ids.length) return;
+        [ids[index], ids[target]] = [ids[target], ids[index]];
+        draftOrder[cat] = ids;
+        updateOrderControls(); renderProductTable(cat);
+      }
+      function saveCustomOrder() {
+        if (!draftOrder) return;
+        customOrder = { potion: productOrderIds("potion"), cultivate: productOrderIds("cultivate") };
+        const persisted = lsSet("mmo_custom_order", JSON.stringify(customOrder));
+        draftOrder = null; updateOrderControls();
+        toast(persisted ? "产物顺序已保存，仅在本地生效" : "浏览器存储不可用，顺序仅在本次打开期间有效", persisted ? "success" : "error");
+      }
       let trendChart = null;
       let leftPanelVisible =
         lsGet("mmo_craft_left_panel") !== "false";
@@ -2250,9 +2330,11 @@
         return Math.floor(sp * 0.95);
       }
       function fmtGold(n) {
+        if (Number.isNaN(n)) return "—";
         return Math.round(n).toLocaleString("zh-CN");
       }
       function fmtDec(n, d) {
+        if (Number.isNaN(n)) return "—";
         return Number(n).toFixed(d);
       }
       function fmtPct(n) {
@@ -2304,6 +2386,13 @@
         if (!el) return;
         const act = el.getAttribute("data-action");
         switch (act) {
+          case "toggleCustomOrder": toggleCustomOrder(); break;
+          case "saveCustomOrder": saveCustomOrder(); break;
+          case "moveProduct": moveProduct(el.dataset.cat, el.dataset.id, Number(el.dataset.step)); break;
+          case "exportBackup": exportData(true); break;
+          case "retrySync": retryCloudSync(); break;
+          case "useCloud": resolveCloudConflict(false); break;
+          case "useLocal": resolveCloudConflict(true); break;
           case "exportData":
             exportData();
             break;
@@ -2327,9 +2416,6 @@
             break;
           case "addSystemMaterial":
             addSystemMaterial();
-            break;
-          case "setNickname":
-            setNickname();
             break;
           case "clearTrendHistory":
             clearTrendHistory();
@@ -2527,6 +2613,8 @@
       function calcProduct(prod) {
         let cost = 0;
         let ingDetails = [];
+        const missingMaterials = prod.ingredients.filter(i => !getMaterialInfo(i.materialId, i.materialType));
+        const valid = prod.ingredients.length > 0 && missingMaterials.length === 0;
         for (const ing of prod.ingredients) {
           const mat = getMaterialInfo(ing.materialId, ing.materialType);
           if (mat) {
@@ -2540,15 +2628,16 @@
             });
           }
         }
+        if (!valid) cost = NaN;
         const afterTax = taxIncome(prod.sellPrice);
         const baseOutput = prod.baseOutput || 1;
         const totalIncome = baseOutput * afterTax;
         const profit = totalIncome - cost;
-        const profitRate =
+        const profitRate = !valid ? NaN :
           cost > 0 ? (profit / cost) * 100 : profit > 0 ? Infinity : 0;
         const dc = (prod.doubleChance || 0) / 100;
         const expProfit = (1 + dc) * totalIncome - cost;
-        const expProfitRate =
+        const expProfitRate = !valid ? NaN :
           cost > 0 ? (expProfit / cost) * 100 : expProfit > 0 ? Infinity : 0;
         const stCost = prod.staminaCost || 1;
         // V2: calculate price range (90% of current price as floor)
@@ -2563,6 +2652,8 @@
         const expProfitLow = (1 + dc) * totalLow - cost,
           expProfitHigh = (1 + dc) * totalHigh - cost;
         return {
+          valid,
+          missingMaterials,
           cost,
           afterTax,
           baseOutput,
@@ -2694,7 +2785,8 @@
         th.innerHTML =
           "<tr>" +
           SORT_FIELDS.map((f) => {
-            const sc = curSort.field === f ? " sorted" : "";
+            const sc = !customOrderEnabled && curSort.field === f ? " sorted" : "";
+            if (customOrderEnabled) return `<th data-col="${f}">${labels[f]}</th>`;
             const tip = titles[f] ? ` title="${titles[f]}"` : "";
             return `<th class="${sc}" data-col="${f}" data-sort="${f}" tabindex="0" role="button" data-action="sortProducts" data-cat="${cat}" data-field="${f}" data-sort-field${tip}>${labels[f]} <span class="sort-arrow">⇅</span></th>`;
           }).join("") +
@@ -2723,8 +2815,11 @@
         const computed = prods.map((p) => ({ ...p, ...calcProduct(p) }));
         const sf = sortState[cat];
 
-        // Sort
+        // Keep personal display order separate from the shared products array.
+        const orderRank = new Map((customOrderEnabled ? productOrderIds(cat) : []).map((id, index) => [id, index]));
         computed.sort((a, b) => {
+          if (customOrderEnabled) return orderRank.get(a.id) - orderRank.get(b.id);
+          if (a.valid !== b.valid) return a.valid ? -1 : 1;
           let va, vb;
           switch (sf.field) {
             case "name":
@@ -2818,12 +2913,12 @@
                 : p.expectedProfit < 0
                   ? "profit-negative"
                   : "profit-zero";
-            const prStr = isFinite(p.profitRate)
+            const prStr = !p.valid ? "—" : isFinite(p.profitRate)
               ? fmtPct(p.profitRate)
               : p.profitRate > 0
                 ? "∞"
                 : "0.0%";
-            const eprStr = isFinite(p.expectedProfitRate)
+            const eprStr = !p.valid ? "—" : isFinite(p.expectedProfitRate)
               ? fmtPct(p.expectedProfitRate)
               : p.expectedProfitRate > 0
                 ? "∞"
@@ -2867,7 +2962,7 @@
               else if (agoH >= 12) nameColor = "color:var(--orange);";
             }
             return `<tr>
-      <td data-col="name"><strong style="${nameColor}">${esc(p.name)}</strong><span class="info-tip"> ℹ<span class="tip-popup"><b>体力：</b>${p.staminaCost} 体 &nbsp;|&nbsp; <b>产出：</b>${p.baseOutput || 1} 个<br><b>原料：</b>${esc(ingStr)}${modInfo}</span></span><span class="edit-prod-btn" data-action="editProduct" data-id="${p.id}" title="编辑产物" aria-label="编辑产物"> ✎</span></td>
+      <td data-col="name"><strong style="${nameColor}">${esc(p.name)}</strong>${!p.valid ? '<span style="color:var(--red)"> 配方不完整，暂停利润计算</span>' : ''}<span class="info-tip"> ℹ<span class="tip-popup"><b>体力：</b>${p.staminaCost} 体 &nbsp;|&nbsp; <b>产出：</b>${p.baseOutput || 1} 个<br><b>原料：</b>${esc(ingStr)}${modInfo}</span></span><span class="edit-prod-btn" data-action="editProduct" data-id="${p.id}" title="编辑产物" aria-label="编辑产物"> ✎</span></td>
       <td data-col="sellPrice">${fmtGold(p.sellPrice)} G</td>
       <td data-col="afterTax" class="income-cell">${fmtGold(p.totalIncome)} G</td>
       <td data-col="cost" class="cost-cell">${fmtGold(p.cost)} G</td>
@@ -2879,8 +2974,9 @@
       <td data-col="staminaExpectedProfit" class="${p.staminaExpectedProfit < 0 ? "profit-negative" : "stamina-cell"}">${fmtDec(p.staminaExpectedProfit, 1)} G/体</td>
       <td data-col="staminaExpectedLow" class="stamina-cell" style="color:var(--gold);">${fmtDec(p.staminaExpectedLow, 1)} G/体</td>
       <td data-col="actions">
-        <button class="btn btn-icon" data-action="editProductSellPrice" data-id="${p.id}" title="快速改售价" aria-label="快速改售价">💰</button>
-        <button class="btn btn-icon" data-action="editProductDoubleChance" data-id="${p.id}" title="修改双倍概率" aria-label="修改双倍概率">🎯</button>
+        ${customOrderEnabled ? `<button class="btn btn-xs" data-action="moveProduct" data-cat="${cat}" data-id="${p.id}" data-step="-1" aria-label="上移 ${esc(p.name)}" ${computed[0].id === p.id ? "disabled" : ""}>↑</button><button class="btn btn-xs" data-action="moveProduct" data-cat="${cat}" data-id="${p.id}" data-step="1" aria-label="下移 ${esc(p.name)}" ${computed[computed.length - 1].id === p.id ? "disabled" : ""}>↓</button>` : ""}
+        <button class="btn btn-icon" data-action="editProductSellPrice" data-id="${p.id}" title="快速改售价（共享）" aria-label="快速改售价">💰</button>
+        <button class="btn btn-icon" data-action="editProductDoubleChance" data-id="${p.id}" title="修改双倍概率（仅本地）" aria-label="修改双倍概率">🎯</button>
         <button class="btn btn-del btn-danger" data-action="deleteProduct" data-id="${p.id}" title="删除" aria-label="删除">✕</button>
       </td>
     </tr>`;
@@ -2923,11 +3019,12 @@
           return;
         }
         formPanel.style.display = "block";
+        if (formPanel.querySelector(".product-form")) return;
 
         formPanel.innerHTML = `
     <div class="product-form">
       <div><label>产物名称</label><input type="text" id="prodName_${cat}" placeholder="例如：高级法力药水"></div>
-      <div><label>当前售价 💰</label><input type="number" id="prodSellPrice_${cat}" placeholder="市场售价" min="1" step="1"></div>
+      <div><label>当前售价 💰 · 共享</label><input type="number" id="prodSellPrice_${cat}" placeholder="市场售价" min="1" step="1"></div>
       <div><label>体力消耗 ⚡</label><input type="number" id="prodStamina_${cat}" placeholder="每次制作消耗" min="1" step="1"></div>
       <div><label>基础产出数量 📦</label><input type="number" id="prodBaseOutput_${cat}" value="1" min="1" step="1"></div>
       <div><label>双倍产出概率 (%) 🎯</label><input type="number" id="prodDouble_${cat}" placeholder="当前等级概率" min="0" max="100" step="0.1" value="0"></div>
@@ -2983,8 +3080,8 @@
           data.products.length;
         document.getElementById("statTotalMaterials").textContent =
           data.systemMaterials.length + data.playerMaterials.length;
-        if (data.products.length > 0) {
-          const all = data.products.map((p) => calcProduct(p));
+        const all = data.products.map((p) => calcProduct(p)).filter(p => p.valid);
+        if (all.length > 0) {
           const bp = all.reduce(
             (a, b) => (b.profit > a.profit ? b : a),
             all[0],
@@ -3142,6 +3239,9 @@
       }
 
       function closeProductForm() {
+        ["potion", "cultivate"].forEach(cat => {
+          document.getElementById(cat === "potion" ? "productFormPotion" : "productFormCultivate").innerHTML = "";
+        });
         activeProductForm = null;
         renderProductForm("potion");
         renderProductForm("cultivate");
@@ -3239,7 +3339,7 @@
         const prod = data.products.find((p) => p.id === prodId);
         if (!prod) return;
         showPrompt(
-          `修改 [${prod.name}] 的双倍概率（%）`,
+          `修改 [${prod.name}] 的双倍概率（%，仅本地）`,
           prod.doubleChance || 0,
           (val) => {
             const chance = parseFloat(val);
@@ -3248,7 +3348,7 @@
               return false;
             }
             prod.doubleChance = chance;
-            saveData();
+            saveData(false);
             renderAll();
             toast(`${prod.name} 双倍概率 → ${fmtDec(chance, 1)}%`);
             return true;
@@ -3329,7 +3429,7 @@
     <div style="display:flex;gap:10px;">
       <div style="flex:1;"><label>体力消耗</label><input type="number" id="epStamina" value="${prod.staminaCost}" min="1"></div>
       <div style="flex:1;"><label>产出数量</label><input type="number" id="epOutput" value="${prod.baseOutput || 1}" min="1"></div>
-      <div style="flex:1;"><label>双倍概率 (%)</label><input type="number" id="epDouble" value="${prod.doubleChance || 0}" min="0" max="100" step="0.1"></div>
+      <div style="flex:1;"><label>双倍概率 (%) · 仅本地</label><input type="number" id="epDouble" value="${prod.doubleChance || 0}" min="0" max="100" step="0.1"></div>
     </div>
     <label>原料配方</label>
     <div id="epIngList" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:6px 8px;"></div>
@@ -3477,6 +3577,7 @@
 
       // ---- Sorting ----
       function sortProducts(cat, field) {
+        if (customOrderEnabled) { toast("请先关闭自定义顺序，再按指标排序"); return; }
         const st = sortState[cat];
         if (st.field === field) {
           st.asc = !st.asc;
@@ -3489,65 +3590,129 @@
       }
 
       // ---- Import / Export ----
-      function exportData() {
-        const blob = new Blob([JSON.stringify(data, null, 2)], {
-          type: "application/json",
-        });
+      const PERSONAL_KEYS = [
+        "mmo_doubleChance", "pessimisticRate", "customOppCost", "freight_slots",
+        "mmo_normal_freight_tasks", "mmo_normal_freight_excludes", "mmo_craft_sort",
+        "mmo_craft_compact", "mmo_craft_theme", "mmo_craft_left_panel", "mmo_craft_card_order",
+        "mmo_custom_order_enabled", "mmo_custom_order", "mmo_price_baselines", "kunPrice", "kunRate",
+      ];
+      function backupPayload(full) {
+        if (!full) return sharedData(data);
+        return {
+          format: "nsh-craft-full-backup", version: 1, exportedAt: new Date().toISOString(),
+          data: JSON.parse(JSON.stringify(data)),
+          personalSettings: Object.fromEntries(PERSONAL_KEYS.map(key => [key, lsGet(key)])),
+        };
+      }
+      function exportData(full = false) {
+        const blob = new Blob([JSON.stringify(backupPayload(full), null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        const ts = new Date();
-        const ds =
-          ts.getFullYear() +
-          "-" +
-          (ts.getMonth() + 1).toString().padStart(2, "0") +
-          "-" +
-          ts.getDate().toString().padStart(2, "0") +
-          "-" +
-          ts.getHours().toString().padStart(2, "0") +
-          ts.getMinutes().toString().padStart(2, "0") +
-          ts.getSeconds().toString().padStart(2, "0");
-        a.download = "逆水寒生活技能数据-" + ds + ".json";
+        a.download = "逆水寒生活技能-" + (full ? "完整备份-" : "共享数据-") + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
         a.click();
-        URL.revokeObjectURL(url);
-        toast("数据已导出");
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast(full ? "完整备份已导出（含已保存的个人设置）" : "共享数据已导出（不含个人双倍概率和顺序）");
       }
-
+      function validatePersonalSettings(settings) {
+        if (!settings || typeof settings !== "object" || Array.isArray(settings)) throw Error("缺少个人设置");
+        const result = {};
+        for (const key of PERSONAL_KEYS) {
+          const raw = settings[key] ?? null;
+          if (raw !== null && (typeof raw !== "string" || raw.length > 2000000)) throw Error("个人设置格式错误");
+          result[key] = raw;
+          if (raw === null) continue;
+          if (["mmo_craft_compact", "mmo_craft_left_panel", "mmo_custom_order_enabled"].includes(key)) {
+            if (!["true", "false"].includes(raw)) throw Error("开关格式错误");
+          } else if (key === "mmo_craft_theme") {
+            if (!["default", "light", "warm"].includes(raw)) throw Error("主题格式错误");
+          } else if (key === "mmo_craft_card_order") {
+            if (!/^[A-Za-z0-9_, -]*$/.test(raw)) throw Error("卡片顺序格式错误");
+          } else if (["pessimisticRate", "customOppCost", "kunPrice", "kunRate"].includes(key)) {
+            if (!raw.trim() || !Number.isFinite(Number(raw))) throw Error("数值格式错误");
+          } else {
+            const value = JSON.parse(raw);
+            if (["freight_slots", "mmo_normal_freight_tasks", "mmo_normal_freight_excludes"].includes(key)) {
+              if (!Array.isArray(value)) throw Error("列表格式错误");
+              if (key === "freight_slots" && value.length !== 8) throw Error("槽位数量错误");
+              value.forEach(item => {
+                if (key === "mmo_normal_freight_excludes") {
+                  if (typeof item !== "string") throw Error("排除列表格式错误");
+                } else if (item !== null || key !== "freight_slots") {
+                  if (!item || !strictId(item.productId) || !Number.isFinite(item.qty) || item.qty < 1 ||
+                    (key === "freight_slots" && (!Number.isFinite(item.rewardQty) || item.rewardQty < 1)) ||
+                    (key === "mmo_normal_freight_tasks" && (!Number.isFinite(item.reward) || item.reward < 1))) throw Error("任务格式错误");
+                }
+              });
+            } else {
+              if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("个人设置对象错误");
+              if (["mmo_doubleChance", "mmo_price_baselines"].includes(key)) {
+                if (Object.values(value).some(n => typeof n !== "number" || !Number.isFinite(n))) throw Error("价格或概率格式错误");
+              } else if (key === "mmo_custom_order") {
+                for (const cat of ["potion", "cultivate"]) {
+                  if (value[cat] !== undefined && (!Array.isArray(value[cat]) || value[cat].some(id => !strictId(id)))) throw Error("产物顺序格式错误");
+                }
+              } else if (key === "mmo_craft_sort") {
+                for (const cat of ["potion", "cultivate"]) {
+                  if (!value[cat] || !SORT_FIELDS.includes(value[cat].field) || typeof value[cat].asc !== "boolean") throw Error("指标排序格式错误");
+                }
+              }
+            }
+          }
+        }
+        return result;
+      }
       function importData(event) {
         const file = event.target.files[0];
+        event.target.value = "";
         if (!file) return;
         const reader = new FileReader();
         reader.onload = function (e) {
           try {
-            const imp = normalizeImportedData(JSON.parse(e.target.result));
-            if (
-              !confirm(
-                `即将导入 ${imp.systemMaterials.length} 系统材料、${imp.playerMaterials.length} 玩家材料、${imp.products.length} 产物、${imp.freightPresets.length} 货运方案。当前数据将被覆盖！`,
-              )
-            )
-              return;
+            const source = JSON.parse(e.target.result);
+            const full = source.format === "nsh-craft-full-backup";
+            if (full && source.version !== 1) throw Error("不支持的备份版本");
+            const imp = normalizeImportedData(full ? source.data : source);
+            const settings = full ? validatePersonalSettings(source.personalSettings) : null;
+            const message = `即将${full ? "恢复完整备份" : "导入共享数据"}：${imp.systemMaterials.length} 系统材料、${imp.playerMaterials.length} 玩家材料、${imp.products.length} 产物、${imp.freightPresets.length} 货运方案。\n当前共享数据将被替换，并同步给其他使用者。\n` +
+              (full ? "个人设置也会恢复，但只保存在此浏览器。" : "此浏览器的个人设置保留。") + "\n建议先完整备份，是否继续？";
+            if (!confirm(message)) return;
+            if (full) {
+              for (const key of PERSONAL_KEYS) {
+                if (settings[key] === null) lsDel(key); else lsSet(key, settings[key]);
+              }
+            }
+            let dc = {};
+            try { dc = JSON.parse(lsGet("mmo_doubleChance") || "{}"); } catch {}
+            imp.products.forEach(p => { p.doubleChance = clampNum(dc?.[p.id], 0, 100, 0); });
             data = imp;
+            closeProductForm();
             saveData();
-            loadFreightData();
-            renderAll();
-            toast("数据导入成功");
+            if (full) {
+              customOrderEnabled = lsGet("mmo_custom_order_enabled") === "true";
+              customOrder = readCustomOrder(); draftOrder = null;
+              sortState = readSortState();
+              leftPanelVisible = lsGet("mmo_craft_left_panel") !== "false";
+              applyPersonalPreferences(); updateOrderControls(); applyLeftPanel(); applyCardOrder();
+            }
+            loadFreightData(); renderAll();
+            toast(full ? "完整备份已恢复，个人设置仅在本地生效" : "共享数据已导入，等待同步");
           } catch (err) {
             console.warn("[import] 导入失败：", err);
-            toast("导入失败：数据格式不正确", "error");
+            toast("导入失败：" + err.message, "error");
           }
         };
+        reader.onerror = () => toast("读取文件失败，请重新选择", "error");
         reader.readAsText(file);
-        event.target.value = "";
       }
 
       // ==================== IMPORT VALIDATION ====================
       // Strictly sanitize imported JSON: every id used in inline handlers must match
       // a whitelist pattern (prevents XSS), numeric fields are coerced, broken rows are dropped.
-      const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
       function safeId(id) {
         return typeof id === "string" && SAFE_ID_RE.test(id) ? id : genId();
       }
-      // 与 safeId 相对：非法/缺失一律返回 null，配合 filter 真正丢弃坏行
+      // 非法/缺失引用保留为 null，计算时明确标记配方不完整。
       function strictId(id) {
         return typeof id === "string" && SAFE_ID_RE.test(id) ? id : null;
       }
@@ -3618,10 +3783,7 @@
                 const ingredients = Array.isArray(p.ingredients)
                   ? p.ingredients
                       .map((i) => ({
-                        // 注意：这里必须用「非法即 null」的严格版。
-                        // 若用 safeId()（非法会补一个新 id），下面 filter 就永远为真，
-                        // 指向不存在材料的原料会变成悬空 id：多算一条原料、
-                        // 显示"(已删除)"、成本按 0 计，还会随云同步扩散给群友。
+                        // 不删除坏原料，否则会低估配方成本。
                         materialId: strictId(i && i.materialId),
                         materialType:
                           (i && i.materialType) === "player"
@@ -3632,9 +3794,7 @@
                           Math.round(numOr(i && i.quantity, 1)),
                         ),
                       }))
-                      .filter((i) => i.materialId)
                   : [];
-                if (!ingredients.length) return null;
                 return {
                   id: safeId(p.id),
                   name,
@@ -3712,10 +3872,6 @@
           });
         }
 
-        clean.lastUpdatedBy =
-          typeof imp.lastUpdatedBy === "string"
-            ? imp.lastUpdatedBy.slice(0, 50)
-            : "";
         clean.lastUpdatedAt =
           typeof imp.lastUpdatedAt === "string"
             ? imp.lastUpdatedAt.slice(0, 40)
@@ -3735,7 +3891,6 @@
           treasurePrice: 0,
           kunPrice: 0,
           kunRate: 97.5,
-          lastUpdatedBy: "",
           lastUpdatedAt: "",
         };
         freightPresets = [];
@@ -4328,6 +4483,7 @@
 
       // 夹取工具：输入框的 min/max 拦不住手输，而这些值会进云同步，必须服务端式兜底
       function clampNum(v, lo, hi, dflt) {
+        if (v === null || v === undefined || (typeof v === "string" && !v.trim())) return dflt;
         const n = Number(v);
         if (!Number.isFinite(n)) return dflt;
         return Math.min(hi, Math.max(lo, n));
@@ -4870,6 +5026,13 @@
           return;
         }
 
+        if (active.some(slot => {
+          const p = data.products.find(p => p.id === slot.productId);
+          return !p || !calcProduct(p).valid;
+        })) {
+          toast("货运中有缺失产物或不完整配方，请先修复后再计算", "error");
+          return;
+        }
         const treasureIncome = taxIncome(treasurePrice); // single fragment after-tax
         // 乾坤寻宝图对应残片价（仅展示对比，不参与主要计算）
         const kunFragmentPrice =
@@ -5378,44 +5541,31 @@
       }
 
       // ==================== INIT ====================
-      (function () {
+      function applyPersonalPreferences() {
         const saved = lsGet("mmo_craft_theme") || "default";
         document.body.setAttribute("data-theme", saved);
         const sel = document.getElementById("themeSelect");
         if (sel) sel.value = saved;
         const comp = lsGet("mmo_craft_compact") === "true";
-        if (comp) {
-          document.body.setAttribute("data-compact", "true");
-          const cb = document.getElementById("compactToggle");
-          if (cb) {
-            cb.style.background = "var(--gold)";
-            cb.style.color = "#1a1a2e";
-          }
+        if (comp) document.body.setAttribute("data-compact", "true");
+        else document.body.removeAttribute("data-compact");
+        const cb = document.getElementById("compactToggle");
+        if (cb) {
+          cb.style.background = comp ? "var(--gold)" : "";
+          cb.style.color = comp ? "#1a1a2e" : "";
         }
-      })();
+      }
+      applyPersonalPreferences();
+      updateOrderControls();
       applyLeftPanel();
       applyCardOrder(); // 恢复上次拖拽的卡片顺序（在渲染/绑定之前，避免视觉跳动）
       renderAll();
       loadFreightData();
       initFreightDrag();
       initDragDrop();
-      if (nickname)
-        document.getElementById("nickDisplay").textContent =
-          "\u{1F464} " + nickname;
       // 后台尝试云端连接（REST 直连探测，不影响首屏渲染）
-      initCloud().then((ok) => {
-        if (!ok) return;
+      initCloud().then(() => {
         cloudListen();
-        // 首屏这次拉取同样要防覆盖：请求在途期间用户可能已经改了数据
-        const seqAtBoot = localEditSeq;
-        cloudLoad().then((d) => {
-          if (!d) return;
-          if (localEditSeq !== seqAtBoot || cloudSavePending) {
-            console.warn("[cloud] 首屏拉取期间有本地新编辑，跳过云端覆盖");
-            return;
-          }
-          applyCloudData(d);
-        });
         // 记录访问日志
         fetch("https://api.ipify.org?format=json")
           .then((r) => r.json())
